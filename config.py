@@ -32,6 +32,26 @@ MODEL_FAMILIES = {
         #     default_chat_config,
         # ),
     ],
+    "Llama 3": [
+        ModelConfig(
+            ModelBackendConfig(repository="meta-llama/Meta-Llama-3-70B", aliases=["meta-llama/Meta-Llama-3-70B"]),
+            ModelFrontendConfig(
+                name="META LLAMA 3 (70B)",
+                model_card="https://huggingface.co/meta-llama/Meta-Llama-3-70B",
+                license="https://huggingface.co/meta-llama/Meta-Llama-3-70B/blob/main/LICENSE",
+            ),
+            default_chat_config,
+        ),
+        # ModelConfig(
+        #     ModelBackendConfig(repository="meta-llama/Meta-Llama-3-70B-Instruct"),
+        #     ModelFrontendConfig(
+        #         name="Llama 3 (70B-Instruct)",
+        #         model_card="https://huggingface.co/meta-llama/Meta-Llama-3-70B-Instruct",
+        #         license="https://huggingface.co/meta-llama/Meta-Llama-3-70B-Instruct/blob/main/LICENSE",
+        #     ),
+        #     default_chat_config,
+        # ),
+    ],
     # "Falcon": [
     #     ModelConfig(
     #         ModelBackendConfig(repository="tiiuae/falcon-180B-chat", public_api=False),
