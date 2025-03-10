@@ -12,13 +12,13 @@ default_chat_config = ModelChatConfig(
 )
 
 MODEL_FAMILIES = {
-    "Llama 2": [
+    "Bigscience": [
         ModelConfig(
-            ModelBackendConfig(repository="petals-team/StableBeluga2", aliases=["stabilityai/StableBeluga2"]),
+            ModelBackendConfig(repository="bigscience/bloom-560m", aliases=["bigscience/bloom-560m"]),
             ModelFrontendConfig(
-                name="Stable Beluga 2 (70B)",
-                model_card="https://huggingface.co/stabilityai/StableBeluga2",
-                license="https://huggingface.co/stabilityai/StableBeluga2/blob/main/LICENSE.txt",
+                name="bloom-560",
+                model_card="https://huggingface.co/bigscience/bloom-560m",
+                license="https://huggingface.co/https://huggingface.co/bigscience/bloom-560m/blob/main/LICENSE.txt",
             ),
             default_chat_config,
         ),
