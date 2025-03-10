@@ -1,107 +1,190 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
-  <head>
-    <meta charset="utf-8">
+<head>
+    <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <link rel="icon" class="js-site-favicon" type="image/png" href="./static/logo.svg">
-    <title>Petals &ndash; Decentralized platform for running large language models</title>
+    <meta name="description" content="Aicrunch – Decentralized platform for running large language models">
+    <link rel="icon" class="js-site-favicon" type="image/png" href="logo.png">
+    <title>Aicrunch – Decentralized Platform for Running Large Language Models</title>
     <link href="./static/bootstrap.min.css" rel="stylesheet">
     <link href="./static/style.css" rel="stylesheet">
-  </head>
-  <body>
+    
+</head>
+<body>
+    <div class="background-wave"></div>
+    <main class="control">
+        
+        <header class="chat-header">
+            <h1 class="chat-header__title">
+                <div class="chat-header__logo" role="img" aria-label=" Logo"></div>
+                Aicrunch <span>Chat</span>
+            </h1>
+            <span class="chat-header__status">Online</span>
+        </header>
 
-<main>
-  <div class="position-relative overflow-hidden px-5 pt-1 m-md-4 text-center">
-    <div class="col-lg-6 col-md-8 p-md-3 mx-auto my-3" style="max-width: 700px;">
-      <div class="mb-4">
-        <div class="d-md-inline-block pe-md-4">
-          <a target="_blank" href="https://petals.dev"><img src="./static/logo.svg" height="100" class="rot-image"></a>
-        </div>
-        <h1 class="display-4 fw-bold d-md-inline-block justify-content-center" style="font-size: 40pt; vertical-align: middle;">
-          Petals
-          <span style="font-size: 25pt; color: #aaa;">Chat</span>
-        </h1>
-      </div>
-      <div class="welcome mb-4">
-        <div>
-          <b>Welcome!</b> This is a demo app running
-          <a target="_blank" class="model-name" href="{{ default_model.frontend.model_card }}">{{ default_model.frontend.name }}</a>
-          over the <a target="_blank" href="https://petals.dev">Petals</a> network.
-          Please follow the model's
-          <a target="_blank" class="license-link" href="{{ default_model.frontend.license }}">terms of use</a>
-          and do not enter sensitive data.
-          The chat history is recorded.
-        </div>
-        <form id="settings">
-          <div class="mt-2">
-            <label class="group-label">Family:</label>
-            <div class="btn-group family-selector" role="group">
-              {% for family in model_families.keys() %}
-              {% set family_id = family.lower().replace(" ", "-") %}
-              <input type="radio" class="btn-check" name="family" value="{{ family_id }}" id="family-{{ family_id }}"
-                  {% if loop.first %}checked{% endif %}>
-              <label class="btn btn-outline-primary" for="family-{{ family_id }}">{{ family }}</label>
-              {% endfor %}
+        
+        <section class="welcome">
+            <div>
+                <b>Welcome!</b> This is a demo app running
+                <a target="_blank" class="model-name" href="{{ default_model.frontend.model_card }}">{{ default_model.frontend.name }}</a>
+                over the <a target="_blank" href="https://petals.dev">Petals</a> network.
+                Please follow the model's
+                <a target="_blank" class="license-link" href="{{ default_model.frontend.license }}">terms of use</a>
+                and do not enter sensitive data.
+                The chat history is recorded.
             </div>
-          </div>
-          <div class="mt-2">
-            <label class="group-label">Model:</label>
-            {% for family, family_models in model_families.items() %}
-            {% set family_id = family.lower().replace(" ", "-") %}
-            {% set family_loop = loop %}
-            <div class="model-selector btn-group" role="group" data-family="{{ family_id }}"
-                {% if not loop.first %}style="display: none;"{% endif %}>
-              {% for model in family_models %}
-              {% set model_id = model.backend.key.lower().replace("/", "-") %}
-              <input type="radio" class="btn-check" name="model" value="{{ model.backend.key }}" id="{{ model_id }}"
-                  {% if family_loop.first and loop.first %}checked{% endif %}>
-              <label class="btn btn-outline-primary" for="{{ model_id }}">{{ model.frontend.name }}</label>
-              {% endfor %}
+            <form id="settings">
+                <div class="mt-2">
+                    <label class="group-label" for="family">Family:</label>
+                    <div class="btn-group family-selector" role="group" aria-label="Model Family Selector">
+                        {% for family in model_families.keys() %}
+                        {% set family_id = family.lower().replace(" ", "-") %}
+                        <input type="radio" class="btn-check" name="family" value="{{ family_id }}" id="family-{{ family_id }}"
+                            {% if loop.first %}checked{% endif %}>
+                        <label class="btn btn-outline-primary" for="family-{{ family_id }}">{{ family }}</label>
+                        {% endfor %}
+                    </div>
+                </div>
+                <div class="mt-2">
+                    <label class="group-label" for="model">Model:</label>
+                    {% for family, family_models in model_families.items() %}
+                    {% set family_id = family.lower().replace(" ", "-") %}
+                    {% set family_loop = loop %}
+                    <div class="model-selector btn-group" role="group" data-family="{{ family_id }}"
+                        {% if not loop.first %}style="display: none;"{% endif %} aria-label="Model Selector for {{ family }}">
+                        {% for model in family_models %}
+                        {% set model_id = model.backend.key.lower().replace("/", "-") %}
+                        <input type="radio" class="btn-check" name="model" value="{{ model.backend.key }}" id="{{ model_id }}"
+                            {% if family_loop.first and loop.first %}checked{% endif %}>
+                        <label class="btn btn-outline-primary" for="{{ model_id }}">{{ model.frontend.name }}</label>
+                        {% endfor %}
+                    </div>
+                    {% endfor %}
+                </div>
+            </form>
+            <div class="temperature-slider">
+                <label for="temperature">Temperature:</label>
+                <input type="range" id="temperature" min="0" max="1" step="0.01" value="0.7" aria-label="Temperature Slider">
+                <span id="temp-value">0.7</span>
             </div>
-            {% endfor %}
-          </div>
-        </form>
-      </div>
-      <div class="dialogue">
-        <p class="human-replica">A chat between a curious human and an artificial intelligence assistant. The assistant gives helpful, detailed, and polite answers to the user's questions.</p>
-        <p class="ai-replica"><span class="text">Assistant: Hi! How can I help you?</span></p>
-        <p class="human-replica"><textarea class="form-control" id="exampleTextarea" rows="2">Human: </textarea></p>
-      </div>
-      <p class="error-box" style="display: none;">
-        Request failed. <a class="retry-link" href="#">Retry</a><br>
-        <span class="error-message"></span>
-        <span class="out-of-capacity"><br>
-          <b>We're out of capacity</b> &mdash; attention caches of existing servers are full.
-          Please come back later, or
-          <a target="_blank" href="https://github.com/bigscience-workshop/petals#connect-your-gpu-and-increase-petals-capacity">connect your GPU</a>
-          to increase Petals capacity now!
-        </span>
-      </p>
+        </section>
 
-      <p class="acknowledgements mt-5 pt-3">
-        <b>Shift+Enter</b> inserts newlines.<br>
-        See source code and API docs on <a target="_blank" href="https://github.com/petals-infra/chat.petals.dev">GitHub</a>.
-      </p>
-    </div>
-  </div>
-</main>
+        
+        <section class="dialogue" aria-label="Chat Conversation">
+            
+            <div class="message message--ai">
+                <div class="message__content">
+                    <div class="message__avatar" role="img" aria-label="AI Avatar"></div>
+                    <span class="message__text">Hi! How can I help you?</span>
+                </div>
+            </div>
+            
+            <div id="chat-messages"></div>
+        </section>
+
+        
+        <div class="chat-footer">
+            <textarea class="chat-footer__input" id="messageInput" placeholder="Type your message..." rows="1" aria-label="Message Input"></textarea>
+            <button class="chat-footer__send" onclick="sendMessage()">Send</button>
+        </div>
+
+        
+        <section class="error-box" style="display: none;" aria-live="polite">
+            Request failed. <a class="retry-link" href="#">Retry</a><br>
+            <span class="error-message"></span>
+            <span class="out-of-capacity"><br>
+                <b>We're out of capacity</b> — attention caches of existing servers are full.
+                Please come back later, or
+                <a target="_blank" href="https://github.com/bigscience-workshop/petals#connect-your-gpu-and-increase-petals-capacity">connect your GPU</a>
+                to increase Petals capacity now!
+            </span>
+        </section>
+
+        
+        <footer class="acknowledgements">
+            <b>Shift+Enter</b> inserts newlines.<br>
+            See source code and API docs on <a target="_blank" href="https://github.com/petals-infra/chat.petals.dev">GitHub</a>.
+        </footer>
+    </main>
+
+    
     <script src="https://code.jquery.com/jquery-3.3.1.min.js" crossorigin="anonymous"></script>
     <script src="./static/autosize.min.js"></script>
-
     <script>
-      const modelConfigs = {{ model_config_json|safe }};
-      const defaultModel = {{ default_model.backend.key|tojson|safe }};
+        const modelConfigs = {{ model_config_json|safe }};
+        const defaultModel = {{ default_model.backend.key|tojson|safe }};
+
+        
+        const tempSlider = document.getElementById('temperature');
+        const tempValue = document.getElementById('temp-value');
+        tempSlider.addEventListener('input', () => {
+            tempValue.textContent = tempSlider.value;
+        });
+
+        
+        const chatMessages = document.getElementById('chat-messages');
+        const messageInput = document.getElementById('messageInput');
+        const dialogue = document.querySelector('.dialogue');
+
+        function sendMessage() {
+            const messageText = messageInput.value.trim();
+            if (!messageText) return;
+
+            
+            const userMessage = createMessage(messageText, 'human');
+            chatMessages.appendChild(userMessage);
+
+            
+            messageInput.value = '';
+
+            
+            dialogue.scrollTop = dialogue.scrollHeight;
+
+            
+        
+        }
+
+        function createMessage(text, type) {
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `message message--${type}`;
+
+            const contentDiv = document.createElement('div');
+            contentDiv.className = 'message__content';
+
+            const avatarDiv = document.createElement('div');
+            avatarDiv.className = 'message__avatar';
+            avatarDiv.setAttribute('role', 'img');
+            avatarDiv.setAttribute('aria-label', type === 'human' ? 'Human Avatar' : 'AI Avatar');
+
+            const textSpan = document.createElement('span');
+            textSpan.className = 'message__text';
+            textSpan.textContent = text;
+
+            contentDiv.appendChild(avatarDiv);
+            contentDiv.appendChild(textSpan);
+            messageDiv.appendChild(contentDiv);
+            return messageDiv;
+        }
+
+        
+        messageInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                sendMessage();
+            }
+        });
+
+        
+        autosize(messageInput);
     </script>
     <script src="./static/chat.js?v=18"></script>
-
-    <!-- Google tag (gtag.js) -->
+    
     <script async src="https://www.googletagmanager.com/gtag/js?id=G-LENBCEYH86"></script>
     <script>
-      window.dataLayer = window.dataLayer || [];
-      function gtag(){dataLayer.push(arguments);}
-      gtag('js', new Date());
-
-      gtag('config', 'G-LENBCEYH86');
+        window.dataLayer = window.dataLayer || [];
+        function gtag(){dataLayer.push(arguments);}
+        gtag('js', new Date());
+        gtag('config', 'G-LENBCEYH86');
     </script>
-  </body>
+</body>
 </html>
