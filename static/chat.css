@@ -56,27 +56,7 @@
     background-color: #e5e5e5;
 }
 
-body {
-    min-height: 100vh;
-    background: linear-gradient(135deg, #74ebd5 0%, #acb6e5 100%);
-    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-    overflow-x: hidden;
-    position: relative;
-    color: #fff;
-}
 
-/* Background Wave Animation */
-.background-wave {
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    background: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1440 320"><path fill="rgba(255,255,255,0.1)" fill-opacity="1" d="M0,160L48,170.7C96,181,192,203,288,197.3C384,192,480,160,576,138.7C672,117,768,107,864,128C960,149,1056,203,1152,213.3C1248,224,1344,192,1392,176L1440,160L1440,320L1392,320C1344,320,1248,320,1152,320C1056,320,960,320,864,320C768,320,672,320,576,320C480,320,384,320,288,320C192,320,96,320,48,320L0,320Z"></path></svg>');
-    background-size: cover;
-    animation: wave 10s infinite linear;
-    z-index: -1;
-}
 /*
  * Extra utilities
  */
@@ -90,64 +70,9 @@ body {
         flex: 1;
     }
 }
-/*slider*/
-/* Temperature Slider */
-.temperature-slider {
-    margin-top: 10px;
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    font-size: 0.9rem;
-    color: #ddd;
-}
 
-    .temperature-slider input[type="range"] {
-        flex: 1;
-        -webkit-appearance: none;
-        appearance: none;
-        height: 8px;
-        background: rgba(255, 255, 255, 0.3);
-        border-radius: 5px;
-        outline: none;
-        transition: background 0.3s ease;
-    }
 
-        .temperature-slider input[type="range"]:hover {
-            background: rgba(255, 255, 255, 0.5);
-        }
-
-        .temperature-slider input[type="range"]::-webkit-slider-thumb {
-            -webkit-appearance: none;
-            appearance: none;
-            width: 20px;
-            height: 20px;
-            background: #1a73e8;
-            border-radius: 50%;
-            cursor: pointer;
-            transition: transform 0.2s ease, box-shadow 0.3s ease;
-        }
-
-        .temperature-slider input[type="range"]::-moz-range-thumb {
-            width: 20px;
-            height: 20px;
-            background: #1a73e8;
-            border-radius: 50%;
-            cursor: pointer;
-            transition: transform 0.2s ease, box-shadow 0.3s ease;
-        }
-
-        .temperature-slider input[type="range"]:hover::-webkit-slider-thumb,
-        .temperature-slider input[type="range"]:focus::-webkit-slider-thumb {
-            transform: scale(1.2);
-            box-shadow: 0 0 10px rgba(26, 115, 232, 0.5);
-        }
-
-        .temperature-slider input[type="range"]:hover::-moz-range-thumb,
-        .temperature-slider input[type="range"]:focus::-moz-range-thumb {
-            transform: scale(1.2);
-            box-shadow: 0 0 10px rgba(26, 115, 232, 0.5);
-        }
-            .form-control:focus {
+.form-control:focus {
     /* From Bootswatch Flatly theme */
     border-color: #969fa8;
     box-shadow: 0 0 0 0.25rem rgb(44 62 80 / 25%);
@@ -182,7 +107,27 @@ body {
 .lead {
     font-size: 13pt;
 }
+body {
+    min-height: 100vh;
+    background: linear-gradient(135deg, #74ebd5 0%, #acb6e5 100%);
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    overflow-x: hidden;
+    position: relative;
+    color: #fff;
+}
 
+/* Background Wave Animation */
+.background-wave {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1440 320"><path fill="rgba(255,255,255,0.1)" fill-opacity="1" d="M0,160L48,170.7C96,181,192,203,288,197.3C384,192,480,160,576,138.7C672,117,768,107,864,128C960,149,1056,203,1152,213.3C1248,224,1344,192,1392,176L1440,160L1440,320L1392,320C1344,320,1248,320,1152,320C1056,320,960,320,864,320C768,320,672,320,576,320C480,320,384,320,288,320C192,320,96,320,48,320L0,320Z"></path></svg>');
+    background-size: cover;
+    animation: wave 10s infinite linear;
+    z-index: -1;
+}
 main p {
     font-size: 10pt;
 }
@@ -203,7 +148,9 @@ main p {
         list-style: none;
         text-align: left;
     }
-
+.chat-footer{
+    width:90%;
+}
         .feature-list li:before {
             content: " ";
             position: absolute;
@@ -218,27 +165,16 @@ main p {
             background-size: 35px;
         }
 
-.human-replica, .welcome, .error-box {
-    border: 1px solid #777;
-    background-color:#1a73e8;
-    border-radius: 10px;
-    padding: 10px 15px;
-    width: 90vw;
-    text-align: left;
-    word-wrap: break-word;
-    color: black;
-    position: sticky
+.human-replica, .ai-replica, .welcome, .error-box {
+    color: #ddd;
+    font-style: italic;
+    font-size: 0.9rem;
+    margin-bottom: 20px;
+    text-align: center;
+    width: 100%;
 }
 
-.human-replica,  .error-message {
-    white-space: pre-wrap;
-}
 
-.human-replica {
-    background-color: #f7f7ff;
-    margin-left: auto;
-    margin-right: 0;
-}
 
     .human-replica:focus-within {
         border: 2px solid black;
@@ -246,12 +182,12 @@ main p {
     }
 
     .human-replica textarea {
-        background-color: #f7f7ff !important;
-        border: none;
-        resize: none;
-        padding: 0;
-        width: 88vw;
-        font-size: 10pt;
+        flex: 1;
+        padding: 20px 0;
+        overflow-y: auto;
+        display: flex;
+        flex-direction: column;
+        gap: 5px;
     }
 
         .human-replica textarea.form-control:focus {
@@ -261,16 +197,6 @@ main p {
 
 .ai-replica {
     background-color: #fff7f7;
-    color: black;
-    flex: 1;
-    padding: 20px 0;
-    overflow-y: auto;
-    display: flex;
-    flex-direction: column;
-    gap: 15px;
-    width:400px;
-    border: 2px solid black;
-    border-radius:10px;
 }
 
 .speed, .generation-controls, .suggest-join {
@@ -352,20 +278,4 @@ main p {
 
 .reset-btn {
     font-size: 9pt;
-}
-#avatar {
-    width: 30px;
-    height: 30px;
-    border-radius: 50%;
-    flex-shrink: 0;
-    background: url('avatar.png') center/cover;
-    margin: 10px;
-}
-#avatar2 {
-    width: 30px;
-    height: 30px;
-    border-radius: 50%;
-    flex-shrink: 0;
-    background: url('avatar.png') center/cover;
-    margin: 10px;
 }
