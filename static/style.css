@@ -369,3 +369,20 @@ main p {
     background: url('avatar.png') center/cover;
     margin: 10px;
 }
+button {
+    padding: 10px 20px;
+    font-size: 16px;
+    cursor: pointer;
+    background-color: lightskyblue;
+    color: white;
+    border: none;
+    border-radius: 5px;
+  }
+  button:disabled {
+    background-color: #cccccc;
+    cursor: not-allowed;
+  }
+  #status {
+    margin-top: 10px;
+    font-size: 14px;
+  }
