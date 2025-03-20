@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <link rel="icon" class="js-site-favicon" type="image/png" href="./static/logo.png">
-    <title>Petals &ndash; Decentralized platform for running large language models</title>
+    <title>AIcrunch &ndash; Decentralized platform for running large language models</title>
     <link href="./static/bootstrap.min.css" rel="stylesheet">
     <link href="./static/style.css" rel="stylesheet">
 </head>
@@ -18,7 +18,7 @@
                         <a target="_blank" href="https://petals.dev"><img src="./static/logo.svg" height="100" class="rot-image"></a>
                     </div>
                     <h1 class="display-4 fw-bold d-md-inline-block justify-content-center" style="font-size: 40pt; vertical-align: middle;">
-                        <img src="./static/logo.png" width="500 height=500" />AIcrunch
+                        <img src="./static/logo.png" width="500" height="500" />AIcrunch
                     </h1>
                 </div>
                 <div class="temperature-slider">
@@ -56,12 +56,22 @@
                     </div>
                 </form>
             </div>
-            <button id="connect-wallet">Connect Wallet</button>
-            <div id="status"></div>
-    
-                
-            <div class="dialogue">
 
+            <div class="wallet-section mt-3 mb-3">
+                <button id="connect-wallet" class="btn btn-primary">Connect Wallet</button>
+                <div id="status" class="mt-2"></div>
+            </div>
+
+            <div class="credits-section mt-3 mb-3" style="display: none;">
+                <div id="credits-display" class="mb-2">Available credits: <span id="credit-balance">0</span></div>
+                <div id="buy-credits-form" class="d-flex justify-content-center align-items-center">
+                    <input type="number" id="credits-input" placeholder="Number of credits" min="1" class="form-control me-2" style="max-width: 200px;">
+                    <button id="buy-credits-btn" class="btn btn-success">Buy Credits</button>
+                </div>
+                <div id="error-message" class="mt-2 text-danger"></div>
+            </div>
+
+            <div class="dialogue">
                 <div id="avatar" role="img"></div><p class="ai-replica"><span class="text">Assistant: Hi! How can I help you?</span></p>
                 <div id="avatar2" role="img"></div><p class="human-replica"><textarea class="chat-footer" id="exampleTextarea" rows="2">Human: </textarea></p>
             </div>
@@ -82,10 +92,15 @@
                 See source code and API docs on <a target="_blank" href="https://github.com/petals-infra/chat.petals.dev">GitHub</a>.
             </p>
         </div>
-        </div>
     </main>
-    <script src="https://code.jquery.com/jquery-3.3.1.min.js" crossorigin="anonymous"></script>
+
+    <!-- jQuery -->
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js" crossorigin="anonymous"></script>
     <script src="./static/autosize.min.js"></script>
+
+    <!-- Solana Kit -->
+    <script src="https://unpkg.com/@solana/web3.js@latest/lib/index.iife.min.js"></script>
+    <script src="https://unpkg.com/@solana/kit/dist/index.development.js"></script>
 
     <script>
       const modelConfigs = {{ model_config_json|safe }};
@@ -102,118 +117,250 @@
 
         gtag('config', 'G-LENBCEYH86');
     </script>
-    <!-- Load Solana Web3.js and SPL Token from CDN -->
-  <script src="https://unpkg.com/@solana/web3.js@latest/lib/index.iife.min.js"></script>
-  <script src="https://unpkg.com/@solana/spl-token@latest/lib/index.iife.min.js"></script>
-  <script>
-    // DOM elements
-    const connectButton = document.getElementById('connect-wallet');
-    const statusDiv = document.getElementById('status');
 
-    // Initialize Solana connection
-    const connection = new solanaWeb3.Connection(solanaWeb3.clusterApiUrl('devnet'), 'confirmed');
+    <script>
+        // DOM elements
+        const connectButton = document.getElementById('connect-wallet');
+        const statusDiv = document.getElementById('status');
+        const creditsSection = document.querySelector('.credits-section');
+        const creditBalance = document.getElementById('credit-balance');
+        const buyCreditsBtn = document.getElementById('buy-credits-btn');
+        const creditsInput = document.getElementById('credits-input');
+        const errorMessage = document.getElementById('error-message');
 
-    // Detect Phantom provider
-    function getProvider() {
-      if ('solana' in window) {
-        const provider = window.solana;
-        if (provider.isPhantom) {
-          return provider;
+        // Initialize Solana connection
+        const transport = createDefaultRpcTransport({ url: 'https://api.devnet.solana.com' });
+        const rpc = createSolanaRpcFromTransport(transport);
+        let isConnected = false;
+        let walletPublicKey = null;
+
+        // Temperature slider function
+        document.getElementById('temperature').addEventListener('input', function () {
+            document.getElementById('temp-value').textContent = this.value;
+        });
+
+        // Get wallet provider
+        function getProvider() {
+            if ('solana' in window) {
+                const provider = window.solana;
+                if (provider.isPhantom) {
+                    return provider;
+                }
+            }
+
+            statusDiv.textContent = 'Phantom wallet not detected. Please install it from phantom.app';
+            statusDiv.classList.add('text-danger');
+            return null;
         }
-        statusDiv.textContent = 'Detected a wallet, but it’s not Phantom. Please use Phantom.';
-        statusDiv.style.color = 'red';
-        return null;
-      }
-      statusDiv.textContent = 'No wallet detected. Please install Phantom: https://phantom.app';
-      statusDiv.style.color = 'red';
-      return null;
-    }
 
-    const provider = getProvider();
-    let isConnected = false;
+        // Connect wallet
+        async function connectWallet() {
+            const provider = getProvider();
+            if (!provider) {
+                return;
+            }
 
-    // Connect wallet
-    async function connectWallet() {
-      if (!provider) {
-        statusDiv.textContent = 'Phantom wallet not available. Install it from https://phantom.app';
-        return;
-      }
+            try {
+                connectButton.disabled = true;
+                statusDiv.textContent = 'Connecting to Phantom...';
+                statusDiv.classList.remove('text-danger');
+                statusDiv.classList.add('text-warning');
 
-      try {
-        connectButton.disabled = true;
-        statusDiv.textContent = 'Connecting to wallet...';
-        statusDiv.style.color = 'orange';
+                const resp = await provider.connect();
+                walletPublicKey = resp.publicKey;
+                isConnected = true;
 
-        await provider.connect();
-        isConnected = true;
+                connectButton.textContent = 'Disconnect Wallet';
+                connectButton.disabled = false;
+                statusDiv.textContent = `Connected: ${walletPublicKey.toString().slice(0, 6)}...${walletPublicKey.toString().slice(-4)}`;
+                statusDiv.classList.remove('text-warning');
+                statusDiv.classList.add('text-success');
 
-        const publicKey = provider.publicKey.toString();
-        connectButton.textContent = 'Disconnect Wallet';
-        connectButton.disabled = false;
-        statusDiv.textContent = `Connected: ${publicKey}`;
-        statusDiv.style.color = 'white';
+                // Show credits section
+                creditsSection.style.display = 'block';
 
-        console.log('Wallet connected:', publicKey);
-      } catch (error) {
-        connectButton.disabled = false;
-        statusDiv.textContent = `Failed to connect: ${error.message}`;
-        statusDiv.style.color = 'red';
-        console.error('Connection error:', error);
-      }
-    }
+                // Fetch user's credits
+                await fetchUserCredits(walletPublicKey.toString());
 
-    // Disconnect wallet
-    async function disconnectWallet() {
-      if (!provider || !isConnected) return;
+            } catch (error) {
+                connectButton.disabled = false;
+                statusDiv.textContent = `Connection failed: ${error.message}`;
+                statusDiv.classList.add('text-danger');
+                console.error('Connection error:', error);
+            }
+        }
 
-      try {
-        await provider.disconnect();
-        isConnected = false;
+        // Disconnect wallet
+        async function disconnectWallet() {
+            const provider = getProvider();
+            if (!provider || !isConnected) return;
 
-        connectButton.textContent = 'Connect Wallet';
-        statusDiv.textContent = 'Disconnected';
-        statusDiv.style.color = 'black';
-        console.log('Wallet disconnected');
-      } catch (error) {
-        statusDiv.textContent = `Disconnection failed: ${error.message}`;
-        statusDiv.style.color = 'red';
-        console.error('Disconnection error:', error);
-      }
-    }
-    
-    // Toggle connect/disconnect
-    connectButton.addEventListener('click', () => {
-      if (!isConnected) {
-        connectWallet();
-      } else {
-        disconnectWallet();
-      }
-    });
+            try {
+                await provider.disconnect();
+                isConnected = false;
+                walletPublicKey = null;
 
-    // Handle wallet events
-    if (provider) {
-      provider.on('connect', (publicKey) => {
-        isConnected = true;
-        connectButton.textContent = 'Disconnect Wallet';
-        statusDiv.textContent = `Connected: ${publicKey.toString()}`;
-        statusDiv.style.color = 'blue';
-        console.log('Connected event:', publicKey.toString());
-      });
+                connectButton.textContent = 'Connect Wallet';
+                statusDiv.textContent = 'Disconnected';
+                statusDiv.classList.remove('text-success', 'text-warning');
 
-      provider.on('disconnect', () => {
-        isConnected = false;
-        connectButton.textContent = 'Connect Wallet';
-        statusDiv.textContent = 'Disconnected';
-        statusDiv.style.color = 'black';
-        console.log('Disconnected event');
-      });
+                // Hide credits section
+                creditsSection.style.display = 'none';
 
-      // Check if already connected
-      if (provider.isConnected) {
-        connectWallet();
-      }
-    }
-  </script>
-    
+            } catch (error) {
+                statusDiv.textContent = `Disconnection failed: ${error.message}`;
+                statusDiv.classList.add('text-danger');
+                console.error('Disconnection error:', error);
+            }
+        }
+
+        // Fetch user credits
+        async function fetchUserCredits(walletAddress) {
+            try {
+                const response = await fetch(`/api/get_user_credits?wallet=${walletAddress}`);
+                const data = await response.json();
+
+                if (data.success) {
+                    creditBalance.textContent = data.credits || 0;
+                } else {
+                    console.error('Failed to fetch credits:', data.error);
+                }
+            } catch (error) {
+                console.error('Error fetching user credits:', error);
+            }
+        }
+
+        // Buy credits function
+        async function buyCredits() {
+            if (!isConnected || !walletPublicKey) {
+                errorMessage.textContent = "Please connect your Phantom wallet first";
+                return;
+            }
+
+            const amount = parseInt(creditsInput.value);
+            if (isNaN(amount) || amount <= 0) {
+                errorMessage.textContent = "Please enter a valid number of credits";
+                return;
+            }
+
+            errorMessage.textContent = '';
+            buyCreditsBtn.disabled = true;
+            buyCreditsBtn.textContent = 'Processing...';
+
+            try {
+                const provider = getProvider();
+
+                // Token parameters - example SPL token (replace with your actual token)
+                const tokenMint = new solanaWeb3.PublicKey('4pQaVgu9BdjTkms4pm2VqbTypqKB4URLHVKsakvqFeh4');
+                const receiverAddress = new solanaWeb3.PublicKey(walletPublicKey.toString()); // Replace with your actual wallet
+
+                // Using Solana Kit to create the transaction
+                const solanaKit = window.solanaKit;
+
+                // Create transaction
+                const transaction = new solanaKit.Transaction();
+
+                // Get token accounts
+                const tokenAccounts = await solanaKit.getTokenAccounts(connection, walletPublicKey);
+                const tokenAccount = tokenAccounts.find(account =>
+                    account.mint.equals(tokenMint));
+
+                if (!tokenAccount) {
+                    throw new Error("You don't have any of these tokens in your wallet");
+                }
+
+                // Get or create receiver's token account
+                let receiverTokenAccount;
+                try {
+                    const receiverTokenAccounts = await solanaKit.getTokenAccounts(connection, receiverAddress);
+                    receiverTokenAccount = receiverTokenAccounts.find(account =>
+                        account.mint.equals(tokenMint));
+
+                    if (!receiverTokenAccount) {
+                        throw new Error("Receiver doesn't have a token account for this token");
+                    }
+                } catch (error) {
+                    throw new Error("Failed to find receiver's token account");
+                }
+
+                // Create transfer instruction
+                const transferInstruction = solanaKit.createTransferInstruction(
+                    tokenAccount.address,
+                    receiverTokenAccount.address,
+                    walletPublicKey,
+                    amount * 1000000, // Assuming 6 decimals, adjust if needed
+                );
+
+                transaction.add(transferInstruction);
+
+                // Set recent blockhash
+                transaction.recentBlockhash = (await rpc.getRecentBlockhash()).blockhash;
+                transaction.feePayer = walletPublicKey;
+
+                // Request signing from the user
+                const signedTx = await provider.signTransaction(transaction);
+
+                // Send transaction
+                const signature = await connection.sendRawTransaction(signedTx.serialize());
+
+                // Wait for confirmation
+                await connection.confirmTransaction(signature);
+
+                // Verify payment on server
+                const verifyResponse = await fetch('/api/verify_payment', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        wallet_address: walletPublicKey.toString(),
+                        transaction_signature: signature,
+                        amount: amount
+                    })
+                });
+
+                const verifyData = await verifyResponse.json();
+
+                if (verifyData.success) {
+                    creditBalance.textContent = verifyData.new_balance;
+                    creditsInput.value = '';
+                    alert(`Successfully purchased ${amount} credits!`);
+                } else {
+                    throw new Error(verifyData.error || "Failed to verify payment");
+                }
+
+            } catch (error) {
+                console.error('Error buying credits:', error);
+                errorMessage.textContent = error.message;
+            } finally {
+                buyCreditsBtn.disabled = false;
+                buyCreditsBtn.textContent = 'Buy Credits';
+            }
+        }
+
+        // Toggle wallet connection
+        connectButton.addEventListener('click', () => {
+            if (!isConnected) {
+                connectWallet();
+            } else {
+                disconnectWallet();
+            }
+        });
+
+        // Buy credits button
+        buyCreditsBtn.addEventListener('click', buyCredits);
+
+        // Check if already connected on page load
+        document.addEventListener('DOMContentLoaded', async () => {
+            const provider = getProvider();
+            if (provider && provider.isConnected) {
+                await connectWallet();
+            }
+
+            // Initialize autosize for textarea
+            autosize(document.getElementById('exampleTextarea'));
+
+            // Initialize temperature slider
+            document.getElementById('temp-value').textContent = document.getElementById('temperature').value;
+        });
+    </script>
 </body>
 </html>

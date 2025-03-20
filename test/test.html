@@ -1,0 +1,78 @@
+<html>
+<body>
+    <script src="https://unpkg.com/@solana/web3.js@latest/lib/index.iife.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@solana-program/token@0.5.1/dist/src/index.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/base64-js@1.5.1/base64js.min.js"></script>
+    <script>
+        // Function to transfer tokens using Phantom wallet
+        async function transferToken() {
+            try {
+                // Connect to cluster
+                const connection = new solanaWeb3.Connection(
+                    solanaWeb3.clusterApiUrl("devnet"),
+                    "confirmed"
+                );
+
+                // Get Phantom provider
+                const provider = window.phantom?.solana;
+                if (!provider) {
+                    console.error("Phantom wallet not found");
+                    return;
+                }
+
+                // Connect to Phantom
+                await provider.connect();
+                const sender = provider.publicKey; // Sender's public key from Phantom
+
+                // Token accounts and mint (from earlier example)
+                const senderTokenAccount = new solanaWeb3.PublicKey("EK6ZQQB9k6JyNsG4ZTNbxpCSognpGBaps1StASMDFXFz");
+                const recipientTokenAccount = new solanaWeb3.PublicKey("GLtZtXosMij1A8iyUFAQtaao2n2V4CbenyTe6VdeNWKg");
+                const tokenMint = new solanaWeb3.PublicKey("4pQaVgu9BdjTkms4pm2VqbTypqKB4URLHVKsakvqFeh4");
+
+                // Amount to transfer
+                const amount = 1000000; // Adjust based on token decimals
+
+                // Create transaction
+                const transaction = new solanaWeb3.Transaction();
+
+                // Add token transfer instruction to transaction
+                transaction.add(
+                    spl.createTransferInstruction(
+                        senderTokenAccount,
+                        recipientTokenAccount,
+                        sender,
+                        amount,
+                        [],
+                        new solanaWeb3.PublicKey("TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA") // Token program ID
+                    )
+                );
+
+                // Set the fee payer and recent blockhash
+                transaction.feePayer = sender;
+                const { blockhash } = await connection.getRecentBlockhash();
+                transaction.recentBlockhash = blockhash;
+
+                // Have Phantom sign the transaction
+                const signedTransaction = await provider.signTransaction(transaction);
+
+                // Send the signed transaction
+                const signature = await connection.sendRawTransaction(
+                    signedTransaction.serialize(),
+                    { skipPreflight: false }
+                );
+
+                // Confirm transaction
+                await connection.confirmTransaction(signature, "confirmed");
+
+                console.log("Transfer successful! Transaction signature:", signature);
+                return signature;
+            } catch (error) {
+                console.error("Error:", error);
+                throw error;
+            }
+        }
+
+    transferToken();
+    </script>
+</body>
+</html>

@@ -93,7 +93,8 @@ INITIAL_PEERS = PUBLIC_INITIAL_PEERS
 # INITIAL_PEERS = ['/ip4/10.1.2.3/tcp/31234/p2p/QmcXhze98AcgGQDDYna23s4Jho96n8wkwLJv78vxtFNq44']
 
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
-
+# Add this to config.py
+DEFAULT_MODEL = MODEL_FAMILIES["Bigscience"][0]  # Use bloom-560 as default
 try:
     from cpufeature import CPUFeature
 
