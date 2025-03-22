@@ -58,6 +58,8 @@
             </div>
             <button id="connect-wallet">Connect Wallet</button>
             <div id="status"></div>
+            <button id="check-balance">Check Token Balance</button>
+            <p id="token-balance">Balance: 0 AIcrunch</p>
     
                 
             <div class="dialogue">
@@ -213,6 +215,46 @@
         connectWallet();
       }
     }
+  </script>
+  <script>
+    document.getElementById("check-balance").addEventListener("click", async () => {
+    const walletAddress = window.solana?.publicKey?.toString();
+    const tokenMintAddress = "4pQaVgu9BdjTkms4pm2VqbTypqKB4URLHVKsakvqFeh4"; // Replace with correct Aircrunch token mint address
+
+    if (!walletAddress) {
+        alert("Connect wallet first!");
+        return;
+    }
+
+    const connection = new solanaWeb3.Connection(solanaWeb3.clusterApiUrl("devnet"), "confirmed");
+    const walletPubKey = new solanaWeb3.PublicKey(walletAddress);
+    const tokenMintPubKey = new solanaWeb3.PublicKey(tokenMintAddress);
+
+    try {
+        // Fetch all token accounts owned by the wallet
+        const tokenAccounts = await connection.getParsedTokenAccountsByOwner(walletPubKey, {
+            programId: new solanaWeb3.PublicKey("TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA") // SPL Token Program ID
+        });
+
+        let balance = 0;
+        for (let account of tokenAccounts.value) {
+            let mintAddress = account.account.data.parsed.info.mint;
+            if (mintAddress === tokenMintAddress) {
+                balance = account.account.data.parsed.info.tokenAmount.uiAmount;
+                break;
+            }
+        }
+
+        if (balance > 0) {
+            document.getElementById("token-balance").innerText = `Balance: ${balance} Aircrunch`;
+        } else {
+            document.getElementById("token-balance").innerText = "Balance: 0 Aircrunch (Check Token Mint Address)";
+        }
+    } catch (err) {
+        console.error("Error fetching token balance:", err);
+        document.getElementById("token-balance").innerText = "Error fetching balance. Check console.";
+    }
+});
   </script>
     
 </body>
