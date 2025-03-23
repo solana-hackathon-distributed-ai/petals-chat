@@ -256,6 +256,12 @@
     }
 });
   </script>
+  <script type="module">
+    import { getAssociatedTokenAddress, createTransferInstruction, TOKEN_PROGRAM_ID } from "https://cdn.jsdelivr.net/npm/@solana/spl-token@latest/+esm";
+    window.getAssociatedTokenAddress = getAssociatedTokenAddress;
+    window.createTransferInstruction = createTransferInstruction;
+    window.TOKEN_PROGRAM_ID = TOKEN_PROGRAM_ID;
+</script>
     
 </body>
 </html>

@@ -216,63 +216,90 @@ let forceStop = false;
         sendReplica();
     }
     // Fetch AIcrunch token balance for the collected wallet address
-    const { getAssociatedTokenAddress, Token } = require('@solana/spl-token');
+   
 
-async function payForAIMessage(sender) {
-    const connection = new solanaWeb3.Connection(SOLANA_RPC, "confirmed");
-    const senderPubKey = new solanaWeb3.PublicKey(sender);
-    const receiverPubKey = new solanaWeb3.PublicKey(AI_PAYMENT_WALLET);
+    async function payForAIMessage(sender) {
+        const connection = new solanaWeb3.Connection(SOLANA_RPC, "confirmed");
+        const senderPubKey = new solanaWeb3.PublicKey(sender);
+        const receiverPubKey = new solanaWeb3.PublicKey(AI_PAYMENT_WALLET);
+        const tokenMintPubKey = new solanaWeb3.PublicKey(AI_TOKEN_MINT);
+    
+        try {
+            console.log("🔄 Fetching sender and receiver token accounts...");
+    
+            // Get Associated Token Accounts (ATAs) for sender and receiver
+            const senderTokenAccount = await window.getAssociatedTokenAddress(
+                tokenMintPubKey,
+                senderPubKey
+            );
+            const receiverTokenAccount = await window.getAssociatedTokenAddress(
+                tokenMintPubKey,
+                receiverPubKey
+            );
+    
+            console.log("✅ Found sender and receiver token accounts.");
+    
+            // Create a transaction to transfer 1 AIcrunch token
+            const transaction = new solanaWeb3.Transaction().add(
+                window.createTransferInstruction(
+                    senderTokenAccount,
+                    receiverTokenAccount,
+                    senderPubKey,
+                    1 * 10 ** 6, // 1 AIcrunch token (6 decimals)
+                    [],
+                    window.TOKEN_PROGRAM_ID
+                )
+            );
+    
+            const { blockhash } = await connection.getLatestBlockhash();
+            transaction.recentBlockhash = blockhash;
+            transaction.feePayer = senderPubKey;
+    
+            console.log("🔄 Signing transaction...");
+            const signedTransaction = await window.solana.signTransaction(transaction);
+            console.log("✅ Transaction signed.");
+    
+            console.log("🔄 Sending transaction...");
+            const signature = await connection.sendRawTransaction(signedTransaction.serialize(), {
+                skipPreflight: false,
+                preflightCommitment: "confirmed",
+            });
+    
+            console.log(`✅ AI Payment Success: https://explorer.solana.com/tx/${signature}?cluster=devnet`);
 
-    try {
-        // Get sender's and receiver's Associated Token Accounts (ATAs) for AIcrunch
-        const senderTokenAccount = await getAssociatedTokenAddress(
-            new solanaWeb3.PublicKey(AI_TOKEN_MINT),
-            senderPubKey
-        );
-        const receiverTokenAccount = await getAssociatedTokenAddress(
-            new solanaWeb3.PublicKey(AI_TOKEN_MINT),
-            receiverPubKey
-        );
+            // ✅ Wait for transaction confirmation before proceeding
+            await connection.confirmTransaction(signature, "confirmed");
+            console.log("✅ Transaction confirmed on the blockchain.");
 
-        // Create the transaction to transfer 1 AIcrunch token
-        const transaction = new solanaWeb3.Transaction().add(
-            Token.createTransferInstruction(
-                new solanaWeb3.PublicKey("TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"), // SPL Token Program ID
-                senderTokenAccount,
-                receiverTokenAccount,
-                senderPubKey,
-                [],
-                1 * 10 ** 6 // 1 token with 6 decimals 
-            )
-        );
-
-        const { blockhash } = await connection.getLatestBlockhash();
-        transaction.recentBlockhash = blockhash;
-        transaction.feePayer = senderPubKey;
-
-        const signedTransaction = await window.solana.signTransaction(transaction);
-        const signature = await connection.sendRawTransaction(signedTransaction.serialize());
-
-        console.log("AI Payment Success:", signature);
-        return true;
-    } catch (err) {
-        console.error("AI Payment Failed:", err);
-        return false;
+            return true;
+        } catch (err) {
+            console.error("❌ AI Payment Failed:", err);
+            alert("Transaction failed! Error: " + err.message);
+            return false;
+        }
     }
-}
     // Refresh token balance after transactions
     async function updateBalance() {
         const walletAddress = window.solana?.publicKey?.toString();
         if (!walletAddress) return;
     
         const balance = await getTokenBalance(walletAddress);
-        document.getElementById("token-balance").innerText = `Balance: ${balance} AIcrunch`;
+    
+        const balanceElement = document.getElementById("token-balance");
+        if (balanceElement) {
+            balanceElement.innerText = `Balance: ${balance} AIcrunch`;
+        } else {
+            console.error("❌ Token balance UI element not found.");
+        }
     }
-
     async function upgradeTextArea() {
-        const textarea = $('.human-replica textarea');
-        autosize(textarea);
-        textarea[0].selectionStart = textarea[0].value.length;
+        const textarea = document.querySelector('.human-replica textarea');
+    
+        if (!textarea) {
+            console.error("Textarea not found!");
+            return;
+        }
+    
         textarea.focus();
     
         const walletAddress = window.solana?.publicKey?.toString();
@@ -289,24 +316,36 @@ async function payForAIMessage(sender) {
             return;
         }
     
-        textarea.on('keypress', async e => {
-    if (e.which == 13 && !e.shiftKey) {
-        e.preventDefault();
-        console.log("Enter pressed, processing payment...");
-        
-        const success = await payForAIMessage(walletAddress);
-        if (!success) {
-            console.log("Payment failed, check console for error details.");
-            alert("Transaction failed! Unable to process AI message.");
-            return;
-        }
-
-        console.log("Payment succeeded, updating balance and sending message...");
-        updateBalance();
-        sendReplica();
+        // Remove any previous event listeners to prevent multiple triggers
+        textarea.removeEventListener("keydown", handleEnterKey);
+        textarea.addEventListener("keydown", handleEnterKey);
     }
-});
+    
+    // Handle Enter key event separately
+    async function handleEnterKey(e) {
+        if (e.key === "Enter" && !e.shiftKey) {  
+            e.preventDefault();  
+            console.log("Enter key pressed. Processing transaction...");
+    
+            const walletAddress = window.solana?.publicKey?.toString();
+            if (!walletAddress) {
+                alert("Wallet not connected.");
+                return;
+            }
+    
+            const success = await payForAIMessage(walletAddress);
+            if (!success) {
+                alert("Transaction failed! Unable to process AI message.");
+                return;
+            }
+            console.log("✅ Payment successful, proceeding with AI response...");
+            updateBalance(); // Refresh balance after transaction
+            sendReplica(); // Proceed with AI response
+        }
+    }
+    
 
+    
 
 
     
@@ -316,7 +355,7 @@ async function payForAIMessage(sender) {
         $('.dialogue').append($(
             `<p class="human-replica"><textarea class="form-control" id="exampleTextarea" rows="2">${humanPrompt}</textarea></p>`
         ));
-        upgradeTextArea();
+        setTimeout(upgradeTextArea, 100);
 
     }
 
