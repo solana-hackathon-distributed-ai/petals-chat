@@ -44,7 +44,7 @@ function openSession() {
 
 async function payForAIMessage(sender, tokenCount) {
     try {
-        const response = await fetch('/pay', {
+        const response = await fetch('http://127.0.0.1:5000/pay', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
