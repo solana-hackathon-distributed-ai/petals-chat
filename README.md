@@ -1,3 +1,9 @@
+# git branch
+git checkout -b trying
+git add .
+git commit -m "Your commit message here"
+git push -u origin trying
+
 # Petals Chat
 
 A chatbot [web app](https://chat.petals.dev) + HTTP and WebSocket endpoints for LLM inference with the [Petals](https://petals.dev) client
