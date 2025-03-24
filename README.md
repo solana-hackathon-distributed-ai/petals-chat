@@ -1,6 +1,3 @@
-# Update
-Restricted the chat to two messages with the tokens variable on static/chat.js
-
 # Petals Chat
 
 A chatbot [web app](https://chat.petals.dev) + HTTP and WebSocket endpoints for LLM inference with the [Petals](https://petals.dev) client

@@ -18,7 +18,7 @@
                         <a target="_blank" href="https://petals.dev"><img src="./static/logo.svg" height="100" class="rot-image"></a>
                     </div>
                     <h1 class="display-4 fw-bold d-md-inline-block justify-content-center" style="font-size: 40pt; vertical-align: middle;">
-                        <img src="./static/logo.png" width="500 height=500" />AIcrunch
+                        <img src="static/logo.png" width="500 height=500" />AIcrunch
                     </h1>
                 </div>
                 <div class="temperature-slider">
@@ -56,12 +56,7 @@
                     </div>
                 </form>
             </div>
-            <button id="connect-wallet">Connect Wallet</button>
-            <div id="status"></div>
-            <button id="check-balance">Check Token Balance</button>
-            <p id="token-balance">Balance: 0 AIcrunch</p>
-    
-                
+
             <div class="dialogue">
 
                 <div id="avatar" role="img"></div><p class="ai-replica"><span class="text">Assistant: Hi! How can I help you?</span></p>
@@ -104,164 +99,5 @@
 
         gtag('config', 'G-LENBCEYH86');
     </script>
-    <!-- Load Solana Web3.js and SPL Token from CDN -->
-  <script src="https://unpkg.com/@solana/web3.js@latest/lib/index.iife.min.js"></script>
-  <script src="https://unpkg.com/@solana/spl-token@latest/lib/index.iife.min.js"></script>
-  <script>
-    // DOM elements
-    const connectButton = document.getElementById('connect-wallet');
-    const statusDiv = document.getElementById('status');
-
-    // Initialize Solana connection
-    const connection = new solanaWeb3.Connection(solanaWeb3.clusterApiUrl('devnet'), 'confirmed');
-
-    // Detect Phantom provider
-    function getProvider() {
-      if ('solana' in window) {
-        const provider = window.solana;
-        if (provider.isPhantom) {
-          return provider;
-        }
-        statusDiv.textContent = 'Detected a wallet, but it’s not Phantom. Please use Phantom.';
-        statusDiv.style.color = 'red';
-        return null;
-      }
-      statusDiv.textContent = 'No wallet detected. Please install Phantom: https://phantom.app';
-      statusDiv.style.color = 'red';
-      return null;
-    }
-
-    const provider = getProvider();
-    let isConnected = false;
-
-    // Connect wallet
-    async function connectWallet() {
-      if (!provider) {
-        statusDiv.textContent = 'Phantom wallet not available. Install it from https://phantom.app';
-        return;
-      }
-
-      try {
-        connectButton.disabled = true;
-        statusDiv.textContent = 'Connecting to wallet...';
-        statusDiv.style.color = 'orange';
-
-        await provider.connect();
-        isConnected = true;
-
-        const publicKey = provider.publicKey.toString();
-        connectButton.textContent = 'Disconnect Wallet';
-        connectButton.disabled = false;
-        statusDiv.textContent = `Connected: ${publicKey}`;
-        statusDiv.style.color = 'white';
-
-        console.log('Wallet connected:', publicKey);
-      } catch (error) {
-        connectButton.disabled = false;
-        statusDiv.textContent = `Failed to connect: ${error.message}`;
-        statusDiv.style.color = 'red';
-        console.error('Connection error:', error);
-      }
-    }
-
-    // Disconnect wallet
-    async function disconnectWallet() {
-      if (!provider || !isConnected) return;
-
-      try {
-        await provider.disconnect();
-        isConnected = false;
-
-        connectButton.textContent = 'Connect Wallet';
-        statusDiv.textContent = 'Disconnected';
-        statusDiv.style.color = 'black';
-        console.log('Wallet disconnected');
-      } catch (error) {
-        statusDiv.textContent = `Disconnection failed: ${error.message}`;
-        statusDiv.style.color = 'red';
-        console.error('Disconnection error:', error);
-      }
-    }
-    
-    // Toggle connect/disconnect
-    connectButton.addEventListener('click', () => {
-      if (!isConnected) {
-        connectWallet();
-      } else {
-        disconnectWallet();
-      }
-    });
-
-    // Handle wallet events
-    if (provider) {
-      provider.on('connect', (publicKey) => {
-        isConnected = true;
-        connectButton.textContent = 'Disconnect Wallet';
-        statusDiv.textContent = `Connected: ${publicKey.toString()}`;
-        statusDiv.style.color = 'blue';
-        console.log('Connected event:', publicKey.toString());
-      });
-
-      provider.on('disconnect', () => {
-        isConnected = false;
-        connectButton.textContent = 'Connect Wallet';
-        statusDiv.textContent = 'Disconnected';
-        statusDiv.style.color = 'black';
-        console.log('Disconnected event');
-      });
-
-      // Check if already connected
-      if (provider.isConnected) {
-        connectWallet();
-      }
-    }
-  </script>
-  <script>
-    document.getElementById("check-balance").addEventListener("click", async () => {
-    const walletAddress = window.solana?.publicKey?.toString();
-    const tokenMintAddress = "4pQaVgu9BdjTkms4pm2VqbTypqKB4URLHVKsakvqFeh4"; // Replace with correct Aircrunch token mint address
-
-    if (!walletAddress) {
-        alert("Connect wallet first!");
-        return;
-    }
-
-    const connection = new solanaWeb3.Connection(solanaWeb3.clusterApiUrl("devnet"), "confirmed");
-    const walletPubKey = new solanaWeb3.PublicKey(walletAddress);
-    const tokenMintPubKey = new solanaWeb3.PublicKey(tokenMintAddress);
-
-    try {
-        // Fetch all token accounts owned by the wallet
-        const tokenAccounts = await connection.getParsedTokenAccountsByOwner(walletPubKey, {
-            programId: new solanaWeb3.PublicKey("TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA") // SPL Token Program ID
-        });
-
-        let balance = 0;
-        for (let account of tokenAccounts.value) {
-            let mintAddress = account.account.data.parsed.info.mint;
-            if (mintAddress === tokenMintAddress) {
-                balance = account.account.data.parsed.info.tokenAmount.uiAmount;
-                break;
-            }
-        }
-
-        if (balance > 0) {
-            document.getElementById("token-balance").innerText = `Balance: ${balance} Aircrunch`;
-        } else {
-            document.getElementById("token-balance").innerText = "Balance: 0 Aircrunch (Check Token Mint Address)";
-        }
-    } catch (err) {
-        console.error("Error fetching token balance:", err);
-        document.getElementById("token-balance").innerText = "Error fetching balance. Check console.";
-    }
-});
-  </script>
-  <script type="module">
-    import { getAssociatedTokenAddress, createTransferInstruction, TOKEN_PROGRAM_ID } from "https://cdn.jsdelivr.net/npm/@solana/spl-token@latest/+esm";
-    window.getAssociatedTokenAddress = getAssociatedTokenAddress;
-    window.createTransferInstruction = createTransferInstruction;
-    window.TOKEN_PROGRAM_ID = TOKEN_PROGRAM_ID;
-</script>
-    
 </body>
 </html>
