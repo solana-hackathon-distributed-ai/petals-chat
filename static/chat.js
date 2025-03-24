@@ -1,6 +1,10 @@
 var curModel = defaultModel;
 const falconModel = "tiiuae/falcon-180B-chat";
 
+const AI_TOKEN_MINT = "4pQaVgu9BdjTkms4pm2VqbTypqKB4URLHVKsakvqFeh4"; // AIcrunch Token Mint Address
+const AI_PAYMENT_WALLET = "4d9WDb8dWs5FKCyQxMXAtiwDDsiqFitj6A3PEkz3mK8y"; // payment wallet address
+const SOLANA_RPC = "https://api.devnet.solana.com"; // Devnet RPC 
+
 function getConfig() {
     return modelConfigs[curModel];
 }
@@ -38,6 +42,95 @@ function openSession() {
     };
 }
 
+async function payForAIMessage(sender, tokenCount) {
+    try {
+        const response = await fetch('/pay', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ sender, token_count: tokenCount })
+        });
+
+        const result = await response.json();
+        if (result.status === 'success') {
+            console.log("AI Payment Success:", result.signature);
+            return true;
+        } else {
+            console.error("AI Payment Failed:", result.message);
+            return false;
+        }
+    } catch (err) {
+        console.error("AI Payment Failed:", err);
+        return false;
+    }
+}
+
+function receiveReplica(inputs) {
+    ws.send(JSON.stringify({
+        type: "generate",
+        inputs: inputs,
+        max_new_tokens: 1,
+        stop_sequence: getConfig().chat.stop_token,
+        extra_stop_sequences: getConfig().chat.extra_stop_sequences,
+        ...getConfig().chat.generation_params,
+    }));
+
+    var lastMessageTime = null;
+    ws.onmessage = async event => {
+        connFailureBefore = false;  // We've managed to connect after a possible failure
+
+        const response = JSON.parse(event.data);
+        if (!response.ok) {
+            handleFailure(response.traceback);
+            return;
+        }
+
+        if (lastMessageTime != null) {
+            totalElapsed += performance.now() - lastMessageTime;
+            tokenCount += response.token_count;
+        }
+        lastMessageTime = performance.now();
+
+        const lastReplica = $('.ai-replica .text').last();
+        var newText = lastReplica.text() + response.outputs;
+        if (curModel !== falconModel) {
+            newText = newText.replace(getConfig().chat.stop_token, "");
+        }
+        if (getConfig().chat.extra_stop_sequences !== null) {
+            for (const seq of getConfig().chat.extra_stop_sequences) {
+                newText = newText.replace(seq, "");
+            }
+        }
+        lastReplica.text(newText);
+
+        if (!response.stop && !forceStop) {
+            if (tokenCount >= 1) {
+                const speed = tokenCount / (totalElapsed / 1000);
+                $('.speed')
+                    .text(`Speed: ${speed.toFixed(1)} tokens/sec`)
+                    .show();
+                if (speed < 1) {
+                    $('.suggest-join').show();
+                }
+            }
+        } else {
+            if (forceStop) {
+                resetSession();
+                forceStop = false;
+            }
+            $('.loading-animation, .speed, .suggest-join, .generation-controls').remove();
+            appendTextArea();
+
+            // Pay for the generated tokens
+            const sender = window.solana?.publicKey?.toString();
+            if (sender) {
+                await payForAIMessage(sender, tokenCount);
+            }
+        }
+    };
+}
+
 function resetSession() {
     if (ws !== null && ws.readyState <= 1) {  // If readyState is "connecting" or "opened"
         ws.close();
@@ -54,7 +147,7 @@ function sendReplica() {
     if (isWaitingForInputs()) {
         const aiPrompt = "Assistant:";
         $('.human-replica:last').text($('.human-replica:last textarea').val());
-          $('.dialogue').append($(
+        $('.dialogue').append($(
             '<p class="ai-replica">' +
             `<span class="text">${aiPrompt}</span>` +
             '<span class="loading-animation"></span>' +
@@ -110,65 +203,6 @@ function sendReplica() {
     receiveReplica(inputs);
 }
 
-function receiveReplica(inputs) {
-    ws.send(JSON.stringify({
-        type: "generate",
-        inputs: inputs,
-        max_new_tokens: 1,
-        stop_sequence: getConfig().chat.stop_token,
-        extra_stop_sequences: getConfig().chat.extra_stop_sequences,
-        ...getConfig().chat.generation_params,
-    }));
-
-    var lastMessageTime = null;
-    ws.onmessage = event => {
-        connFailureBefore = false;  // We've managed to connect after a possible failure
-
-        const response = JSON.parse(event.data);
-        if (!response.ok) {
-            handleFailure(response.traceback);
-            return;
-        }
-
-        if (lastMessageTime != null) {
-            totalElapsed += performance.now() - lastMessageTime;
-            tokenCount += response.token_count;
-        }
-        lastMessageTime = performance.now();
-
-        const lastReplica = $('.ai-replica .text').last();
-        var newText = lastReplica.text() + response.outputs;
-        if (curModel !== falconModel) {
-            newText = newText.replace(getConfig().chat.stop_token, "");
-        }
-        if (getConfig().chat.extra_stop_sequences !== null) {
-            for (const seq of getConfig().chat.extra_stop_sequences) {
-                newText = newText.replace(seq, "");
-            }
-        }
-        lastReplica.text(newText);
-
-        if (!response.stop && !forceStop) {
-            if (tokenCount >= 1) {
-                const speed = tokenCount / (totalElapsed / 1000);
-                $('.speed')
-                    .text(`Speed: ${speed.toFixed(1)} tokens/sec`)
-                    .show();
-                if (speed < 1) {
-                    $('.suggest-join').show();
-                }
-            }
-        } else {
-            if (forceStop) {
-                resetSession();
-                forceStop = false;
-            }
-            $('.loading-animation, .speed, .suggest-join, .generation-controls').remove();
-            appendTextArea();
-        }
-    };
-}
-
 function handleFailure(message, autoRetry = false) {
     resetSession();
     if (!isWaitingForInputs()) {
@@ -208,6 +242,7 @@ function retry() {
     $('.error-box').hide();
     sendReplica();
 }
+
 function upgradeTextArea() {
     const textarea = $('.human-replica textarea');
     autosize(textarea);
@@ -221,6 +256,7 @@ function upgradeTextArea() {
         }
     });
 }
+
 function appendTextArea() {
     const humanPrompt = "Human: ";
     $('.dialogue').append($(
@@ -228,8 +264,6 @@ function appendTextArea() {
     ));
     upgradeTextArea();
 }
-
-
 
 const animFrames = ["⌛", "🧠"];
 var curFrame = 0;

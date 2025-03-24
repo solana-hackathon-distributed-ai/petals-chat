@@ -3,3 +3,4 @@ Flask
 flask-sock
 flask-cors
 gunicorn[gthread]
+Flask[async]
