@@ -4,19 +4,20 @@ from flask_cors import CORS
 from flask_sock import Sock
 import utils
 import views
+from spl.token.constants import TOKEN_PROGRAM_ID
 from solana.rpc.api import Client
-from solana.publickey import PublicKey
 from solana.transaction import Transaction
 from solana.transaction import TransactionInstruction, AccountMeta
 from solana.rpc.async_api import AsyncClient
 from solana.rpc.types import TxOpts
 from solana.keypair import Keypair
 from solana.rpc.commitment import Confirmed
+from spl.token.instructions import transfer_checked, get_associated_token_address, TransferCheckedParams
 import json
 import base64
 import logging
 import struct
-
+from solders.pubkey import Pubkey
 
 
 
@@ -24,10 +25,11 @@ app = Flask(__name__)
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+
 SOLANA_RPC_URL = "https://api.devnet.solana.com"
-AI_TOKEN_MINT = "4pQaVgu9BdjTkms4pm2VqbTypqKB4URLHVKsakvqFeh4"
-AI_PAYMENT_WALLET = "4d9WDb8dWs5FKCyQxMXAtiwDDsiqFitj6A3PEkz3mK8y"
-SYSTEM_PROGRAM_ID = PublicKey("11111111111111111111111111111111")
+AI_TOKEN_MINT = Pubkey.from_string("HubuF6KkMvxtRSdq8GmbNkaupedBiSu9ZzuzCm5nBBgs")
+AI_PAYMENT_WALLET = Pubkey.from_string("7KPGDuQtgox24zsfdm86HjizGxEncZtUpzu5BuNywnsV")
+SYSTEM_PROGRAM_ID = Pubkey.from_string("TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA")
 logger.info("Loading models")
 models = utils.load_models()
 
@@ -42,7 +44,7 @@ index_html = views.render_index(app)
 # Load wallet keypair from JSON file with more robust error handling
 def load_keypair():
     try:
-        with open("wallet-keypair.json", "r") as file:
+        with open("id.json", "r") as file:
             secret_key_data = json.load(file)
         
         # Handle different potential formats of secret key storage
@@ -60,78 +62,43 @@ def load_keypair():
         logger.error(f"Error loading keypair: {e}")
         raise
 
-def create_transfer_instruction(from_pubkey, to_pubkey, lamports):
-    """
-    Manually create a transfer instruction for the System Program
-    """
-    # Instruction layout for transfer in the System Program
-    # https://github.com/solana-labs/solana/blob/master/sdk/src/system_instruction.rs
-    TRANSFER_OPCODE = 2  # Transfer instruction opcode
 
-    # Prepare the instruction data
-    instruction_data = struct.pack('<I', TRANSFER_OPCODE) + struct.pack('<Q', lamports)
-
-    return TransactionInstruction(
-        program_id=SYSTEM_PROGRAM_ID,
-        keys=[
-            AccountMeta(pubkey=from_pubkey, is_signer=True, is_writable=True),
-            AccountMeta(pubkey=to_pubkey, is_signer=False, is_writable=True)
-        ],
-        data=instruction_data
-    )
-
+SECRET_KEY=bytes([165,238,96,86,84,95,100,80,59,21,235,67,51,217,217,41,186,41,247,231,205,91,78,172,235,150,213,200,1,225,137,146,93,219,191,148,154,197,74,238,219,65,240,135,83,94,55,216,14,96,113,59,105,231,45,118,97,84,20,249,6,42,6,212])
 @app.route('/pay', methods=['POST'])
 async def pay():
     try:
         data = request.json
         sender = data['sender']
-        token_count = data['token_count']
-        sender_pubkey = PublicKey(sender)
-        receiver_pubkey = PublicKey(AI_PAYMENT_WALLET)
-
+        #token_count = data['token_count']
+        print(sender)
+        sender_pubkey = Pubkey.from_string(sender)
+        receiver_pubkey = AI_PAYMENT_WALLET
+        print(sender)
+        #print(token_count)
         # Calculate the cost based on the number of tokens generated
         cost_per_token = 1 * 10 ** 6  # 1 token with 6 decimals
-        total_cost = token_count * cost_per_token
-
-        # Get recent blockhash for transaction
-        async with AsyncClient(SOLANA_RPC_URL) as client:
-            blockhash_response = await client.get_latest_blockhash()
-            logger.info(f"Blockhash response: {blockhash_response}")
-            
-            # Correctly extract blockhash as a string
-            blockhash = str(blockhash_response.value.blockhash)
-
-        # Create the transaction
+        owner = load_keypair()
         transaction = Transaction()
-        transaction.recent_blockhash = blockhash
-        transaction.fee_payer = sender_pubkey
+        transaction.add(
+            transfer_checked(
+                TransferCheckedParams(
+                    TOKEN_PROGRAM_ID, #DON'T WORRY ABOUT THIS! DON'T TOUCH IT!
+                    AI_PAYMENT_WALLET, #Its not your wallet address! Its the token account address!
+                    AI_TOKEN_MINT, # token address 
+                    sender_pubkey, # to the receiving token account.
+                    AI_PAYMENT_WALLET, # wallet address connected to the from_token_account. needs to have SOL
+                    1, #amount of tokens to send.
+                    9, #default decimal places. Don't touch in it most cases
+                    [] #default. Don't touch it in most cases
 
-        # Add transfer instruction using custom method
-        transfer_ix = create_transfer_instruction(
-            from_pubkey=sender_pubkey,
-            to_pubkey=receiver_pubkey,
-            lamports=total_cost
-        )
-        transaction.add(transfer_ix)
-
-        # Sign and send the transaction
-        async with AsyncClient(SOLANA_RPC_URL) as client:
-            sender_keypair = load_keypair()  # Load the keypair from JSON
-            
-            # Ensure the transaction is signed correctly
-            transaction.sign(sender_keypair)
-            
-            # Serialize the transaction
-            raw_transaction = transaction.serialize()
-            
-            # Send transaction with correct method signature
-            response = await client.send_transaction(
-                raw_transaction,
-                opts=TxOpts(skip_preflight=False, preflight_commitment=Confirmed)
+                )
             )
-           
-            return jsonify({"status": "success", "signature": str(response.value)})
-    
+        )
+        client = Client(endpoint="https://api.devnet.solana.com", commitment=Confirmed) #devnet you can change it to the main net if you want
+        
+        print(owner)# <-- need the keypair for the token owner here! [20,103,349, ... 230,239,239]
+        client.send_transaction(
+            transaction, owner, opts=TxOpts(skip_confirmation=False, preflight_commitment=Confirmed)) 
     except Exception as e:
         logger.error(f"Transaction error: {e}", exc_info=True)
         return jsonify({"status": "error", "message": str(e)}), 400

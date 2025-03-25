@@ -1,7 +1,7 @@
 var curModel = defaultModel;
 const falconModel = "tiiuae/falcon-180B-chat";
 
-const AI_TOKEN_MINT = "4pQaVgu9BdjTkms4pm2VqbTypqKB4URLHVKsakvqFeh4"; // AIcrunch Token Mint Address
+const AI_TOKEN_MINT = "HubuF6KkMvxtRSdq8GmbNkaupedBiSu9ZzuzCm5nBBgs"; // AIcrunch Token Mint Address
 const AI_PAYMENT_WALLET = "4d9WDb8dWs5FKCyQxMXAtiwDDsiqFitj6A3PEkz3mK8y"; // payment wallet address
 const SOLANA_RPC = "https://api.devnet.solana.com"; // Devnet RPC 
 
@@ -42,14 +42,14 @@ function openSession() {
     };
 }
 
-async function payForAIMessage(sender, tokenCount) {
+async function payForAIMessage(sender) {
     try {
         const response = await fetch('http://127.0.0.1:5000/pay', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
             },
-            body: JSON.stringify({ sender, token_count: tokenCount })
+            body: JSON.stringify({ sender:sender})
         });
 
         const result = await response.json();
