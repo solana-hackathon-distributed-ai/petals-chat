@@ -4,6 +4,9 @@ const falconModel = "tiiuae/falcon-180B-chat";
 const AI_TOKEN_MINT = "HubuF6KkMvxtRSdq8GmbNkaupedBiSu9ZzuzCm5nBBgs"; // AIcrunch Token Mint Address
 const AI_PAYMENT_WALLET = "4d9WDb8dWs5FKCyQxMXAtiwDDsiqFitj6A3PEkz3mK8y"; // payment wallet address
 const SOLANA_RPC = "https://api.devnet.solana.com"; // Devnet RPC 
+// Example usage
+const Transaction = new solanaWeb3.Transaction();
+console.log(Transaction);
 
 function getConfig() {
     return modelConfigs[curModel];
@@ -43,29 +46,41 @@ function openSession() {
 }
 
 async function payForAIMessage(sender) {
+    const msg = new solanaWeb3.Message();
     try {
-        const response = await fetch('http://127.0.0.1:5000/pay', {
+        const response = await fetch('http://localhost:3000/chat', {
             method: 'POST',
+            mode: 'cors', // Enable CORS
             headers: {
-                'Content-Type': 'application/json'
+                'Content-Type': 'application/json',
+                'Access-Control-Allow-Origin': '*', // Wildcard CORS origin
+                'Access-Control-Allow-Methods': 'POST, OPTIONS', // Allowed HTTP methods
+                'Access-Control-Allow-Headers': 'Content-Type' // Allowed headers
             },
-            body: JSON.stringify({ sender:sender})
+            body: JSON.stringify({ source: sender })
         });
 
-        const result = await response.json();
-        if (result.status === 'success') {
-            console.log("AI Payment Success:", result.signature);
-            return true;
-        } else {
-            console.error("AI Payment Failed:", result.message);
-            return false;
-        }
-    } catch (err) {
-        console.error("AI Payment Failed:", err);
-        return false;
-    }
-}
+        // Step 1: Decode the base64 transaction data
+        const transactionBuffer = buffer.Buffer.from(data.transaction, "base64");
 
+        // Step 2: Deserialize the legacy transaction
+        const transaction = Transaction.from(transactionBuffer);
+
+        // Step 3: Sign the transaction with the wallet
+        const signedTransaction = await window.solana.signTransaction(transaction);
+
+        // Step 4: Send the transaction
+        const connection = new Connection("https://api.devnet.solana.com", "confirmed");
+        const signature = await connection.sendRawTransaction(signedTransaction.serialize());
+        await connection.confirmTransaction(signature, "confirmed");
+
+        console.log(`Transaction confirmed: ${signature}`);
+        return signature;
+        } catch (error) {
+            console.error("Error sending transaction:", error.message);
+            throw error; // Re-throw to handle it in the calling function if needed
+        }
+}
 function receiveReplica(inputs) {
     ws.send(JSON.stringify({
         type: "generate",
@@ -125,7 +140,7 @@ function receiveReplica(inputs) {
             // Pay for the generated tokens
             const sender = window.solana?.publicKey?.toString();
             if (sender) {
-                await payForAIMessage(sender, tokenCount);
+                await payForAIMessage(sender);
             }
         }
     };

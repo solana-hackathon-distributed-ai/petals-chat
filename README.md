@@ -1,8 +1,18 @@
 # git branch
-git checkout -b trying
+git checkout -b almost
 git add .
 git commit -m "Your commit message here"
-git push -u origin trying
+git push -u origin almost
+
+# How to run
+
+npm i 
+
+to install the modules then run the server using the command below
+
+node server2.ts
+
+Then follow the instructions below to run the client
 
 # Petals Chat
 

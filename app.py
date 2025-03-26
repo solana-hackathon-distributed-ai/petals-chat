@@ -12,16 +12,18 @@ from solana.rpc.async_api import AsyncClient
 from solana.rpc.types import TxOpts
 from solana.keypair import Keypair
 from solana.rpc.commitment import Confirmed
-from spl.token.instructions import transfer_checked, get_associated_token_address, TransferCheckedParams
+from spl.token.instructions import transfer_checked, get_associated_token_address,transfer, TransferParams, TransferCheckedParams
 import json
 import base64
 import logging
 import struct
 from solders.pubkey import Pubkey
+from flask_cors import CORS
 
 
 
 app = Flask(__name__)
+CORS(app, origins=["http://127.0.0.1:1234"])
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
@@ -30,6 +32,7 @@ SOLANA_RPC_URL = "https://api.devnet.solana.com"
 AI_TOKEN_MINT = Pubkey.from_string("HubuF6KkMvxtRSdq8GmbNkaupedBiSu9ZzuzCm5nBBgs")
 AI_PAYMENT_WALLET = Pubkey.from_string("7KPGDuQtgox24zsfdm86HjizGxEncZtUpzu5BuNywnsV")
 SYSTEM_PROGRAM_ID = Pubkey.from_string("TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA")
+RECIEVER_WALLET=Pubkey.from_string("EK6ZQQB9k6JyNsG4ZTNbxpCSognpGBaps1StASMDFXFz")
 logger.info("Loading models")
 models = utils.load_models()
 
@@ -44,7 +47,7 @@ index_html = views.render_index(app)
 # Load wallet keypair from JSON file with more robust error handling
 def load_keypair():
     try:
-        with open("id.json", "r") as file:
+        with open("wallet1.json", "r") as file:
             secret_key_data = json.load(file)
         
         # Handle different potential formats of secret key storage
@@ -63,45 +66,64 @@ def load_keypair():
         raise
 
 
-SECRET_KEY=bytes([165,238,96,86,84,95,100,80,59,21,235,67,51,217,217,41,186,41,247,231,205,91,78,172,235,150,213,200,1,225,137,146,93,219,191,148,154,197,74,238,219,65,240,135,83,94,55,216,14,96,113,59,105,231,45,118,97,84,20,249,6,42,6,212])
+
 @app.route('/pay', methods=['POST'])
 async def pay():
     try:
         data = request.json
         sender = data['sender']
-        #token_count = data['token_count']
-        print(sender)
+        logger.info(f"Sender: {sender}")
         sender_pubkey = Pubkey.from_string(sender)
-        receiver_pubkey = AI_PAYMENT_WALLET
-        print(sender)
-        #print(token_count)
-        # Calculate the cost based on the number of tokens generated
-        cost_per_token = 1 * 10 ** 6  # 1 token with 6 decimals
-        owner = load_keypair()
-        transaction = Transaction()
-        transaction.add(
-            transfer_checked(
-                TransferCheckedParams(
-                    TOKEN_PROGRAM_ID, #DON'T WORRY ABOUT THIS! DON'T TOUCH IT!
-                    AI_PAYMENT_WALLET, #Its not your wallet address! Its the token account address!
-                    AI_TOKEN_MINT, # token address 
-                    sender_pubkey, # to the receiving token account.
-                    AI_PAYMENT_WALLET, # wallet address connected to the from_token_account. needs to have SOL
-                    1, #amount of tokens to send.
-                    9, #default decimal places. Don't touch in it most cases
-                    [] #default. Don't touch it in most cases
+        receiver_wallet = RECIEVER_WALLET  # Receiver wallet address
 
-                )
-            )
+        amount_to_transfer = 1  # Amount to transfer
+
+        # Get the associated token accounts (synchronously):
+        source_token_account = get_associated_token_address(
+            owner=AI_PAYMENT_WALLET,
+            mint=AI_TOKEN_MINT
         )
-        client = Client(endpoint="https://api.devnet.solana.com", commitment=Confirmed) #devnet you can change it to the main net if you want
+        receiver_token_account = get_associated_token_address(
+            owner=receiver_wallet,
+            mint=AI_TOKEN_MINT
+        )
         
-        print(owner)# <-- need the keypair for the token owner here! [20,103,349, ... 230,239,239]
-        client.send_transaction(
-            transaction, owner, opts=TxOpts(skip_confirmation=False, preflight_commitment=Confirmed)) 
+        # Load the keypair for the mint authority
+        owner = load_keypair()
+        logger.info(f"Owner: {owner.public_key}")
+       
+        instruction = transfer_checked(
+                        TransferCheckedParams(
+                            program_id=TOKEN_PROGRAM_ID,
+                            source=sender_pubkey,  # Use the mint authority's associated token account.
+                            mint=AI_TOKEN_MINT,
+                            dest=RECIEVER_WALLET,
+                            owner=source_token_account,
+                            amount=amount_to_transfer,
+                            decimals=9,
+                            signers=[]
+                        )
+    )
+
+
+
+        transaction = Transaction()
+        transaction.add(instruction)
+        
+        async with AsyncClient(SOLANA_RPC_URL) as client:
+            result = await client.send_transaction(
+                transaction,
+                owner,
+                opts=TxOpts(skip_confirmation=False, preflight_commitment=Confirmed)
+            )
+        
+        return jsonify({"status": "success", "transaction_id": str(result)}), 200
+
     except Exception as e:
         logger.error(f"Transaction error: {e}", exc_info=True)
         return jsonify({"status": "error", "message": str(e)}), 400
+
+
 logger = hivemind.get_logger(__file__)
 
 
@@ -114,3 +136,4 @@ if __name__ == '__main__':
 
 import http_api
 import websocket_api
+
