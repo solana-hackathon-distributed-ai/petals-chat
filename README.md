@@ -2,13 +2,7 @@
 
 https://github.com/solana-hackathon-distributed-ai/petals-chat/blob/a75a5b0ee3eeab5ec9c9bfaa712153a3700fd1d0/static/chat.js#L99-L170
 
-# How to run
-
-npm i 
-
-to install the modules then run the server using the command below
-
-node server2.ts
+# app.py
 
 Then follow the instructions below to run the client
 
