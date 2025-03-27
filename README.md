@@ -1,8 +1,6 @@
-# git branch
-git checkout -b almost
-git add .
-git commit -m "Your commit message here"
-git push -u origin almost
+# chat.js
+
+https://github.com/solana-hackathon-distributed-ai/petals-chat/blob/a75a5b0ee3eeab5ec9c9bfaa712153a3700fd1d0/static/chat.js#L99-L170
 
 # How to run
 
