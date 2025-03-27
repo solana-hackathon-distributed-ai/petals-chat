@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Solana Wallet Sign</title>
+    <script src="https://unpkg.com/@solana/web3.js@latest/lib/index.iife.min.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        button {
+            background: #9945FF;
+            color: white;
+            border: none;
+            padding: 10px 15px;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+
+        #status {
+            margin: 15px 0;
+            padding: 10px;
+            border-radius: 5px;
+            background: #f0f0f0;
+        }
+    </style>
+</head>
+<body>
+    <h1>Solana Wallet Authentication</h1>
+    <button id="connectBtn">Connect Wallet</button>
+    <button id="signBtn" disabled>Sign Message</button>
+    <div id="status">Status: Not connected</div>
+
+    <script>
+        const connectBtn = document.getElementById('connectBtn');
+        const signBtn = document.getElementById('signBtn');
+        const statusDiv = document.getElementById('status');
+        let walletPublicKey = null;
+
+        // Check for Phantom Wallet
+        function getProvider() {
+            if ('solana' in window) {
+                const provider = window.solana;
+                if (provider.isPhantom) return provider;
+                statusDiv.textContent = 'Please use Phantom Wallet';
+                return null;
+            }
+            statusDiv.textContent = 'Install Phantom Wallet: https://phantom.app';
+            window.open('https://phantom.app', '_blank');
+            return null;
+        }
+
+        const provider = getProvider();
+
+        // Connect Wallet
+        connectBtn.addEventListener('click', async () => {
+            if (!provider) return;
+
+            try {
+                connectBtn.disabled = true;
+                statusDiv.textContent = 'Connecting...';
+
+                const response = await provider.connect();
+                walletPublicKey = response.publicKey.toString();
+
+                connectBtn.textContent = 'Disconnect';
+                signBtn.disabled = false;
+                statusDiv.textContent = `Connected: ${walletPublicKey.slice(0, 5)}...`;
+            } catch (error) {
+                statusDiv.textContent = `Error: ${error.message}`;
+            } finally {
+                connectBtn.disabled = false;
+            }
+        });
+
+        // Sign Message
+        signBtn.addEventListener('click', async () => {
+            if (!provider || !walletPublicKey) return;
+
+            try {
+                signBtn.disabled = true;
+                statusDiv.textContent = 'Preparing message...';
+
+                // Get message from backend
+                const response = await fetch('http://localhost:5000/api/request-signature', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ publicKey: walletPublicKey })
+                });
+
+                const { message } = await response.json();
+                statusDiv.textContent = 'Please sign in Phantom...';
+
+                // Convert message to Uint8Array
+                const encodedMessage = new TextEncoder().encode(message);
+                const { signature } = await provider.signMessage(encodedMessage);
+
+                // Verify with backend
+                const verification = await fetch('http://localhost:5000/api/verify-signature', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        publicKey: walletPublicKey,
+                        message: message,
+                        signature: Array.from(signature)  // Convert to regular array
+                    })
+                });
+
+                const result = await verification.json();
+                statusDiv.textContent = result.message;
+            } catch (error) {
+                statusDiv.textContent = `Signing failed: ${error.message}`;
+            } finally {
+                signBtn.disabled = false;
+            }
+        });
+    </script>
+</body>
+</html>

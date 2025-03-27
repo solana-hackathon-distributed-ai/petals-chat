@@ -1,9 +1,11 @@
 import hivemind
-from flask import Flask, request, jsonify
+from flask import Flask, send_from_directory, jsonify, request
 from flask_cors import CORS
 from flask_sock import Sock
 import utils
 import views
+
+
 from spl.token.constants import TOKEN_PROGRAM_ID
 from solana.rpc.api import Client
 from solana.transaction import Transaction
@@ -18,21 +20,32 @@ import base64
 import logging
 import struct
 from solders.pubkey import Pubkey
-from flask_cors import CORS
 
+logger = hivemind.get_logger(__file__)
 
+logger.info("Loading models")
+models = utils.load_models()
 
+logger.info("Starting Flask app")
 app = Flask(__name__)
-CORS(app, origins=["http://127.0.0.1:1234"])
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
+CORS(app)
+app.config["SOCK_SERVER_OPTIONS"] = {"ping_interval": 25}
+sock = Sock(app)
+
+logger.info("Pre-rendering index page")
+index_html = views.render_index(app)
+
+# Serve static files from test directory
+@app.route('/test/<path:filename>')
+def serve_test(filename):
+    return send_from_directory('test', filename)
 
 
 SOLANA_RPC_URL = "https://api.devnet.solana.com"
 AI_TOKEN_MINT = Pubkey.from_string("HubuF6KkMvxtRSdq8GmbNkaupedBiSu9ZzuzCm5nBBgs")
 AI_PAYMENT_WALLET = Pubkey.from_string("7KPGDuQtgox24zsfdm86HjizGxEncZtUpzu5BuNywnsV")
 SYSTEM_PROGRAM_ID = Pubkey.from_string("TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA")
-RECIEVER_WALLET=Pubkey.from_string("EK6ZQQB9k6JyNsG4ZTNbxpCSognpGBaps1StASMDFXFz")
+RECEIVER_WALLET = Pubkey.from_string("EK6ZQQB9k6JyNsG4ZTNbxpCSognpGBaps1StASMDFXFz")
 logger.info("Loading models")
 models = utils.load_models()
 
@@ -67,14 +80,15 @@ def load_keypair():
 
 
 
-@app.route('/pay', methods=['POST'])
+@app.route('/api/pay', methods=['POST'])
 async def pay():
     try:
         data = request.json
-        sender = data['sender']
+        sender = data['source']
         logger.info(f"Sender: {sender}")
         sender_pubkey = Pubkey.from_string(sender)
-        receiver_wallet = RECIEVER_WALLET  # Receiver wallet address
+        logger.info(f"Sender pubkey: {sender_pubkey}")
+        receiver_wallet = RECEIVER_WALLET  # Receiver wallet address
 
         amount_to_transfer = 1  # Amount to transfer
 
@@ -89,15 +103,15 @@ async def pay():
         )
         
         # Load the keypair for the mint authority
-        owner = load_keypair()
-        logger.info(f"Owner: {owner.public_key}")
+        #owner = load_keypair()
+        #logger.info(f"Owner: {owner.public_key}")
        
         instruction = transfer_checked(
                         TransferCheckedParams(
                             program_id=TOKEN_PROGRAM_ID,
                             source=sender_pubkey,  # Use the mint authority's associated token account.
                             mint=AI_TOKEN_MINT,
-                            dest=RECIEVER_WALLET,
+                            dest=receiver_token_account,
                             owner=source_token_account,
                             amount=amount_to_transfer,
                             decimals=9,
@@ -108,32 +122,55 @@ async def pay():
 
 
         transaction = Transaction()
+        logger.info('Transaction:', transaction)
         transaction.add(instruction)
         
-        async with AsyncClient(SOLANA_RPC_URL) as client:
-            result = await client.send_transaction(
-                transaction,
-                owner,
-                opts=TxOpts(skip_confirmation=False, preflight_commitment=Confirmed)
-            )
-        
-        return jsonify({"status": "success", "transaction_id": str(result)}), 200
+        async_client = AsyncClient(SOLANA_RPC_URL)
+        recent_blockhash = await async_client.get_latest_blockhash()
+        blockhash = recent_blockhash['result']['value']['blockhash']
+        transaction.recent_blockhash = blockhash
+        transaction.fee_payer = Pubkey(sender)
+        serialized_tx = transaction.serialize()
+        base64_tx = base64.b64encode(serialized_tx).decode('utf-8')
+
+        return jsonify({
+            "status": "success",
+            "transaction": base64_tx,
+            "network": "devnet"
+        }), 200
 
     except Exception as e:
-        logger.error(f"Transaction error: {e}", exc_info=True)
+        logger.error(f"Error creating transaction: {str(e)}")
         return jsonify({"status": "error", "message": str(e)}), 400
 
 
-logger = hivemind.get_logger(__file__)
+
 
 
 @app.route("/")
 def main_page():
     return index_html
 
-if __name__ == '__main__':
-    app.run(debug=True)
+@app.route('/api/request-signature', methods=['POST'])
+def request_signature():
+    data = request.json  # Fixed: use request instead of requests
+    # In a real app, you would prepare the transaction here
+    logger.info(data)
+    return jsonify({
+        'message': 'Sign this message to authenticate',
+        'network': 'devnet',
+        'reference': 'auth-request-123'
+    })
+
+@app.route('/api/verify-signature', methods=['POST'])
+def verify_signature():
+    data = request.json  # Fixed: use request instead of requests
+    # In a real app, you would verify the signature here
+    return jsonify({
+        'verified': True,
+        'publicKey': data.get('publicKey'),
+        'message': 'Authentication successful'
+    })
 
 import http_api
 import websocket_api
-

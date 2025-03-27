@@ -44,43 +44,193 @@ function openSession() {
         }
     };
 }
-
-async function payForAIMessage(sender) {
-    const msg = new solanaWeb3.Message();
+async function prepareTransaction(transactionJson) {
     try {
-        const response = await fetch('http://localhost:3000/chat', {
+        // Establish connection
+        const connection = new solanaWeb3.Connection(
+            solanaWeb3.clusterApiUrl('devnet'), // or mainnet-beta
+            'confirmed'
+        );
+
+        // Create a new transaction
+        const transaction = new solanaWeb3.Transaction();
+
+        // Handle instructions
+        if (transactionJson.instructions && transactionJson.instructions.length > 0) {
+            transactionJson.instructions.forEach(instruction => {
+                // Validate keys
+                const validKeys = instruction.keys.map(key => ({
+                    pubkey: new solanaWeb3.PublicKey(key.pubkey),
+                    isSigner: key.isSigner || false,
+                    isWritable: key.isWritable || false
+                }));
+
+                // Create transaction instruction
+                const txInstruction = new solanaWeb3.TransactionInstruction({
+                    keys: validKeys,
+                    programId: new solanaWeb3.PublicKey(instruction.programId),
+                    data: Buffer.from(instruction.data || [])
+                });
+
+                transaction.add(txInstruction);
+            });
+        }
+
+        // Get recent blockhash if not provided
+        const { blockhash } = await connection.getLatestBlockhash();
+        transaction.recentBlockhash = blockhash;
+
+        // Handle fee payer
+        if (transactionJson.signers && transactionJson.signers.length > 0) {
+            // Assume first signer is fee payer
+            const feePayerPublicKey = new solanaWeb3.PublicKey(transactionJson.signers[0]);
+            transaction.feePayer = feePayerPublicKey;
+          
+        } else {
+            throw new Error('No fee payer specified');
+        }
+        
+        return { transaction, connection };
+    } catch (error) {
+        console.error('Transaction preparation error:', error);
+        throw error;
+    }
+}
+async function payForAIMessage(sender) {
+    
+    try {
+        // 1. Request signature from backend
+        const authResponse = await fetch('/api/request-signature', {
             method: 'POST',
-            mode: 'cors', // Enable CORS
-            headers: {
-                'Content-Type': 'application/json',
-                'Access-Control-Allow-Origin': '*', // Wildcard CORS origin
-                'Access-Control-Allow-Methods': 'POST, OPTIONS', // Allowed HTTP methods
-                'Access-Control-Allow-Headers': 'Content-Type' // Allowed headers
-            },
+            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ source: sender })
         });
+        if (!authResponse.ok) throw new Error('Auth request failed');
+        const { message, network } = await authResponse.json();
 
-        // Step 1: Decode the base64 transaction data
-        const transactionBuffer = buffer.Buffer.from(data.transaction, "base64");
+        // 2. Prepare message for signing
+        const encodedMsg = new TextEncoder().encode(message);
 
-        // Step 2: Deserialize the legacy transaction
-        const transaction = Transaction.from(transactionBuffer);
+        // 3. Sign with Phantom Wallet
+        if (!window.solana?.isConnected) await window.solana.connect();
+        const { publicKey, signature: walletSignature } = await window.solana.signMessage(encodedMsg);
 
-        // Step 3: Sign the transaction with the wallet
-        const signedTransaction = await window.solana.signTransaction(transaction);
+        // 4. Verify signature with backend
+        const verificationResponse = await fetch('/api/verify-signature', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                publicKey: publicKey.toString(),
+                message: message,
+                signature: Array.from(walletSignature),
+                network: network
+            })
+        });
+        if (!verificationResponse.ok) throw new Error('Verification failed');
+        const verification = await verificationResponse.json();
+        if (!verification.verified) throw new Error('Signature verification failed');
 
-        // Step 4: Send the transaction
-        const connection = new Connection("https://api.devnet.solana.com", "confirmed");
-        const signature = await connection.sendRawTransaction(signedTransaction.serialize());
-        await connection.confirmTransaction(signature, "confirmed");
+        // 5. Get transaction from backend
+        const paymentResponse = await fetch('/api/pay', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ source: sender })
+        });
+        
+        if (!paymentResponse.ok) throw new Error('Transaction creation failed');
+        const { transaction: base64Tx } = await paymentResponse.json();
 
-        console.log(`Transaction confirmed: ${signature}`);
-        return signature;
-        } catch (error) {
-            console.error("Error sending transaction:", error.message);
-            throw error; // Re-throw to handle it in the calling function if needed
-        }
+        // 6. Deserialize and send transaction
+        const txBuffer = Uint8Array.from(atob(base64Tx), c => c.charCodeAt(0));
+        const transaction = solanaWeb3.Transaction.from(txBuffer);
+         
+        const signedTx = await window.solana.signTransaction(transaction);
+        const connection = new solanaWeb3.Connection(
+            solanaWeb3.clusterApiUrl(network || 'devnet'),
+            'confirmed'
+        );
+
+        const signature = await connection.sendRawTransaction(signedTx.serialize());
+        const confirmation = await connection.confirmTransaction(signature);
+        console.log("The transaction confirmation is", confirmation );
+ 
+
+
+        return {
+            signature,
+            confirmation,
+            explorerUrl: `https://explorer.solana.com/tx/${signature}?cluster=${network}`
+        };
+
+    } catch (error) {
+        //console.log("Transaction signatures:", transaction.signatures);
+        console.error('Payment failed:', error);
+        throw new Error(error.message || 'Payment process failed');
+    }
 }
+
+/*async function payForAIMessage(sender) {
+    try {
+        // 1. Request signature from backend
+        const { message, network } = await fetch('/api/request-signature', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ source: sender })
+        })
+
+        // 2. Prepare message for signing
+        const encodedMsg = new TextEncoder().encode(message);
+
+        // 3. Sign with Phantom Wallet
+        if (!window.solana?.isConnected) await window.solana.connect();
+        const { publicKey, signature: walletSignature } = await window.solana.signMessage(encodedMsg);
+
+        // 4. Verify signature with backend
+        const verification = await fetch('/api/verify-signature', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                publicKey: publicKey.toString(),
+                message: message,
+                signature: Array.from(walletSignature),
+                network: network
+            })
+        })
+
+        if (!verification.verified) throw new Error('Signature verification failed');
+
+        // 5. Get transaction from backend after verification
+        const { transaction: txData } = await fetch('/api/pay', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                source: sender
+            })
+        })
+        const result = await response.json();
+        if (!response.ok) {
+            throw new Error(result.message || 'Failed to create transaction');
+        }
+        // 6. Deserialize and send transaction
+        const txBuffer = buffer.Buffer.from(txData, 'base64');
+        const transaction = solanaWeb3.Transaction.from(txBuffer);
+
+        const signedTx = await window.solana.signTransaction(transaction);
+        const connection = new solanaWeb3.Connection(
+            solanaWeb3.clusterApiUrl(network || 'devnet'),
+            'confirmed'
+        );
+
+        const signature = await connection.sendRawTransaction(signedTx.serialize());
+        await connection.confirmTransaction(signature);
+
+        return signature;
+
+    } catch (error) {
+        console.error('Payment failed:', error);
+        throw error;
+    }
+}*/
 function receiveReplica(inputs) {
     ws.send(JSON.stringify({
         type: "generate",
@@ -139,6 +289,7 @@ function receiveReplica(inputs) {
 
             // Pay for the generated tokens
             const sender = window.solana?.publicKey?.toString();
+            console.log("the sender is", sender);
             if (sender) {
                 await payForAIMessage(sender);
             }
