@@ -39,7 +39,7 @@ function openSession() {
 }
 
 function resetSession() {
-    if (ws !== null && ws.readyState <= 1) {  // If readyState is "connecting" or "opened"
+    if (ws !== null && ws.readyState <= 1) {
         ws.close();
     }
     ws = null;
@@ -54,9 +54,9 @@ function sendReplica() {
     if (isWaitingForInputs()) {
         const aiPrompt = "Assistant:";
         $('.human-replica:last').text($('.human-replica:last textarea').val());
-          $('.dialogue').append($(
+        $('.dialogue').append($(
             '<p class="ai-replica">' +
-            `<span class="text">${aiPrompt}</span>` +
+            `<span class="text"><span class="ai-response">${aiPrompt}</span></span>` +
             '<span class="loading-animation"></span>' +
             '<span class="speed" style="display: none;"></span>' +
             '<span class="generation-controls"><a class="stop-generation" href=#>stop generation</a></span>' +
@@ -87,19 +87,15 @@ function sendReplica() {
         const el = $(replicaDivs[i]);
         var phrase = el.text();
         if (curModel === falconModel) {
-            if (i < 2) {
-                // Skip the system prompt and the 1st assistant's message to match the HF demo format precisely
-                continue;
-            }
+            if (i < 2) continue;
             phrase = phrase.replace(/^Human:/, 'User:');
             phrase = phrase.replace(/^Assistant:/, 'Falcon:');
         }
         if (el.is(".human-replica")) {
             phrase += getConfig().chat.sep_token;
-        } else
-            if (i < replicaDivs.length - 1) {
-                phrase += getConfig().chat.stop_token;
-            }
+        } else if (i < replicaDivs.length - 1) {
+            phrase += getConfig().chat.stop_token;
+        }
         replicas.push(phrase);
     }
     const inputs = replicas.join("");
@@ -114,7 +110,7 @@ function receiveReplica(inputs) {
     ws.send(JSON.stringify({
         type: "generate",
         inputs: inputs,
-        max_new_tokens: 1,
+        max_new_tokens: 16,  // ✅ increased for better speed
         stop_sequence: getConfig().chat.stop_token,
         extra_stop_sequences: getConfig().chat.extra_stop_sequences,
         ...getConfig().chat.generation_params,
@@ -122,7 +118,7 @@ function receiveReplica(inputs) {
 
     var lastMessageTime = null;
     ws.onmessage = event => {
-        connFailureBefore = false;  // We've managed to connect after a possible failure
+        connFailureBefore = false;
 
         const response = JSON.parse(event.data);
         if (!response.ok) {
@@ -136,16 +132,19 @@ function receiveReplica(inputs) {
         }
         lastMessageTime = performance.now();
 
-        const lastReplica = $('.ai-replica .text').last();
+        const lastReplica = $('.ai-replica .ai-response').last();
         var newText = lastReplica.text() + response.outputs;
+
         if (curModel !== falconModel) {
             newText = newText.replace(getConfig().chat.stop_token, "");
         }
+
         if (getConfig().chat.extra_stop_sequences !== null) {
             for (const seq of getConfig().chat.extra_stop_sequences) {
                 newText = newText.replace(seq, "");
             }
         }
+
         lastReplica.text(newText);
 
         if (!response.stop && !forceStop) {
@@ -172,8 +171,6 @@ function receiveReplica(inputs) {
 function handleFailure(message, autoRetry = false) {
     resetSession();
     if (!isWaitingForInputs()) {
-        // Show the error and the retry button only if a user is waiting for the generation results
-
         if (message === "Connection failed" && !connFailureBefore) {
             autoRetry = true;
             connFailureBefore = true;
@@ -183,7 +180,6 @@ function handleFailure(message, autoRetry = false) {
         }
         const maxSessionLength = getConfig().chat.max_session_length;
         if (/Maximum length exceeded/.test(message) && sessionLength < maxSessionLength) {
-            // We gradually increase sessionLength to save server resources. Default: 512 -> 2048 -> 8192 (if supported)
             sessionLength = Math.min(sessionLength * 4, maxSessionLength);
             autoRetry = true;
         }
@@ -208,6 +204,7 @@ function retry() {
     $('.error-box').hide();
     sendReplica();
 }
+
 function upgradeTextArea() {
     const textarea = $('.human-replica textarea');
     autosize(textarea);
@@ -221,6 +218,7 @@ function upgradeTextArea() {
         }
     });
 }
+
 function appendTextArea() {
     const humanPrompt = "Human: ";
     $('.dialogue').append($(
@@ -228,8 +226,6 @@ function appendTextArea() {
     ));
     upgradeTextArea();
 }
-
-
 
 const animFrames = ["⌛", "🧠"];
 var curFrame = 0;
@@ -261,6 +257,7 @@ $(() => {
         firstLabel.click();
         firstLabel.trigger('click');
     });
+
     $('.model-selector label').click(function (e) {
         if (!isWaitingForInputs()) {
             alert("Can't switch the model while the AI is writing a response. Please refresh the page");
@@ -281,6 +278,7 @@ $(() => {
         $('.license-link').attr('href', getConfig().frontend.license);
         setTimeout(() => $('.human-replica textarea').focus(), 10);
     });
+
     $('.retry-link').click(e => {
         e.preventDefault();
         retry();
