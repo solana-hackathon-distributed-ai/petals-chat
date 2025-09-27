@@ -56,8 +56,10 @@ function sendReplica() {
         const humanText = $(".human-replica:last textarea").val().trim();
 
         $(".human-replica:last").text(`Human: ${humanText}`);
-        $(".dialogue").append($(
+	$(".dialogue").append($(`<div id="avatar2"></div>`));
+	$(".dialogue").append($(
             `<p class="ai-replica">
+	
                 <span class="text">${aiPrompt} </span>
                 <span class="loading-animation"></span>
                 <span class="speed" style="display: none;"></span>
@@ -72,10 +74,18 @@ function sendReplica() {
             </p>`
         ));
         animateLoading();
+	$(".dialogue").append($(`<div id=avatar></div>`));
         $(".stop-generation").click(e => {
             e.preventDefault();
             forceStop = true;
         });
+ const lastHumanMsg = $('.human-replica:last');
+        lastHumanMsg.addClass('message message--human');
+        const humanAvatar = $('#avatar2').clone().removeAttr('id'); // clone template
+        lastHumanMsg.prepend(humanAvatar);
+        const humanContent = $('<span class="message__content"></span>');
+        humanContent.append(lastHumanMsg.text());
+        lastHumanMsg.empty().append(humanAvatar, humanContent);
     } else {
         $(".loading-animation").show();
     }
